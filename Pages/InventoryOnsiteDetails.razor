@@ -1,0 +1,252 @@
+@page "/inventory-onsite"
+@using AccessMigrationApp.Models.LockerDB
+@using AccessMigrationApp.Models.ViewModels
+@using Microsoft.EntityFrameworkCore
+@inject LockerDbContext LockerDbContext
+@inject NavigationManager NavigationManager
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Inventory Onsite Details</h3>
+</div>
+
+@if (inventoryItems == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("ID"))">
+                        ID
+                        <span class="oi @(GetSortIcon("ID"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Name"))">
+                        Name
+                        <span class="oi @(GetSortIcon("Name"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Description"))">
+                        Description
+                        <span class="oi @(GetSortIcon("Description"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Type"))">
+                        Type
+                        <span class="oi @(GetSortIcon("Type"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Class"))">
+                        Class
+                        <span class="oi @(GetSortIcon("Class"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Location"))">
+                        Location
+                        <span class="oi @(GetSortIcon("Location"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("LocationType"))">
+                        Location Type
+                        <span class="oi @(GetSortIcon("LocationType"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Berth"))">
+                        Berth
+                        <span class="oi @(GetSortIcon("Berth"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Gear"))">
+                        Gear
+                        <span class="oi @(GetSortIcon("Gear"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Cargo"))">
+                        Cargo
+                        <span class="oi @(GetSortIcon("Cargo"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("OnHand"))">
+                        On Hand
+                        <span class="oi @(GetSortIcon("OnHand"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Issued"))">
+                        Issued
+                        <span class="oi @(GetSortIcon("Issued"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("StandardCost"))">
+                        Std Cost
+                        <span class="oi @(GetSortIcon("StandardCost"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Process"))">
+                        Process
+                        <span class="oi @(GetSortIcon("Process"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("TestClass"))">
+                        Test Class
+                        <span class="oi @(GetSortIcon("TestClass"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Visual"))">
+                        Visual
+                        <span class="oi @(GetSortIcon("Visual"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Thorough"))">
+                        Thorough
+                        <span class="oi @(GetSortIcon("Thorough"))"></span>
+                    </th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in inventoryItems)
+                {
+                    <tr>
+                        <td>@item.ItemId</td>
+                        <td>@item.ItemName</td>
+                        <td>@item.Description</td>
+                        <td>@item.Type</td>
+                        <td>@item.Class</td>
+                        <td>@item.LocationName</td>
+                        <td>@item.LocationType</td>
+                        <td>@item.Berth</td>
+                        <td>@item.Gear</td>
+                        <td>@item.Cargo</td>
+                        <td>@item.OnHand</td>
+                        <td>@item.Issued</td>
+                        <td>@(item.StandardCost?.ToString("C2") ?? "")</td>
+                        <td>@item.Process</td>
+                        <td>@item.TestClass</td>
+                        <td>@(item.Visual?.ToShortDateString() ?? "")</td>
+                        <td>@(item.Thorough?.ToShortDateString() ?? "")</td>
+                        <td>
+                            <span class="badge @(item.IsActive ? "bg-success" : "bg-danger")">
+                                @(item.IsActive ? "Active" : "Inactive")
+                            </span>
+                            @if (item.IsBillable)
+                            {
+                                <span class="badge bg-info ms-1">Billable</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-sm" @onclick="() => NavigateToEdit(item.ItemId)">
+                                <span class="oi oi-pencil"></span>
+                            </button>
+                            <button class="btn btn-info btn-sm ms-1" @onclick="() => ViewLocation(item.LocationId)">
+                                <span class="oi oi-map-marker"></span>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<InventoryLocationViewModel>? inventoryItems;
+    private string currentSortColumn = "ID";
+    private bool isAscending = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            // Using the inventory_lists view from SQL Server
+            var items = await LockerDbContext.InventoryLocations
+                .FromSqlRaw("SELECT * FROM dbo.inventory_lists")
+                .Select(il => new InventoryLocationViewModel
+                {
+                    ItemId = il.ItemId!,
+                    ItemName = il.ItemName!,
+                    Description = il.Description ?? "",
+                    Type = il.Inventory!.InvType,
+                    Class = il.Inventory!.Class,
+                    LocationId = il.LocationId ?? 0,
+                    LocationName = il.Location!.Name!,
+                    LocationType = il.Location!.LocationType ?? "",
+                    Berth = il.Location!.Berth,
+                    Gear = il.Location!.Gear,
+                    Cargo = il.Location!.Cargo,
+                    OnHand = il.OnHand ?? 0,
+                    Issued = il.Issued ?? 0,
+                    StandardCost = il.Inventory!.StandardCost,
+                    Process = il.Inventory!.Process,
+                    TestClass = il.Inventory!.TestClass,
+                    Visual = il.Inventory!.Visual,
+                    Thorough = il.Inventory!.Thorough,
+                    IsActive = il.Inventory!.Active == 1,
+                    IsBillable = il.Inventory!.Billable == 1
+                })
+                .ToListAsync();
+
+            inventoryItems = ApplySort(items);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading inventory onsite details: {ex.Message}");
+        }
+    }
+
+    private List<InventoryLocationViewModel> ApplySort(IEnumerable<InventoryLocationViewModel> query)
+    {
+        Func<InventoryLocationViewModel, object?> sortSelector = currentSortColumn switch
+        {
+            "ID" => i => i.ItemId,
+            "Name" => i => i.ItemName,
+            "Description" => i => i.Description,
+            "Type" => i => i.Type,
+            "Class" => i => i.Class,
+            "Location" => i => i.LocationName,
+            "LocationType" => i => i.LocationType,
+            "Berth" => i => i.Berth,
+            "Gear" => i => i.Gear,
+            "Cargo" => i => i.Cargo,
+            "OnHand" => i => i.OnHand,
+            "Issued" => i => i.Issued,
+            "StandardCost" => i => i.StandardCost,
+            "Process" => i => i.Process,
+            "TestClass" => i => i.TestClass,
+            "Visual" => i => i.Visual,
+            "Thorough" => i => i.Thorough,
+            _ => i => i.ItemId
+        };
+
+        return isAscending ? query.OrderBy(sortSelector).ToList() : query.OrderByDescending(sortSelector).ToList();
+    }
+
+    private void SortBy(string columnName)
+    {
+        if (currentSortColumn == columnName)
+        {
+            isAscending = !isAscending;
+        }
+        else
+        {
+            currentSortColumn = columnName;
+            isAscending = true;
+        }
+
+        if (inventoryItems != null)
+        {
+            inventoryItems = ApplySort(inventoryItems);
+        }
+    }
+
+    private string GetSortIcon(string columnName)
+    {
+        if (currentSortColumn != columnName)
+            return "";
+
+        return isAscending ? "oi-caret-top" : "oi-caret-bottom";
+    }
+
+    private void NavigateToEdit(string itemId)
+    {
+        var encodedId = Uri.EscapeDataString(itemId);
+        NavigationManager.NavigateTo($"/inventory/edit/{encodedId}");
+    }
+
+    private void ViewLocation(int locationId)
+    {
+        NavigationManager.NavigateTo($"/inventory/{locationId}");
+    }
+} 

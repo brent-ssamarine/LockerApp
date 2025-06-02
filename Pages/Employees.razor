@@ -1,0 +1,120 @@
+@page "/employees"
+@using AccessMigrationApp.Models.BCMEA
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components
+@using Employee = AccessMigrationApp.Models.BCMEA.Employee
+@inject AccessMigrationApp.Data.BCMEA.BCMEAContext BCMEAContext
+
+<h3>Employees List</h3>
+
+@if (_employees == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Employee #</th>
+                    <th>Name</th>
+                    <th>Home Port</th>
+                    <th>Class</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var employee in _employees)
+                {
+                    <tr>
+                        <td>@employee.EmployeeNumber</td>
+                        <td>@($"{employee.LastName}, {employee.FirstName} {employee.Initial}")</td>
+                        <td>@employee.HomePort</td>
+                        <td>@employee.Class</td>
+                        <td>@employee.Status</td>
+                        <td>
+                            <a href="@($"/employees/edit/{employee.Id}")" class="btn btn-primary btn-sm">Edit</a>
+                            <button class="btn btn-info btn-sm" @onclick="() => ViewDetails(employee)">Details</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showDetails)
+{
+    <div class="modal fade show" style="display: block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Employee Details</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDetails"></button>
+                </div>
+                <div class="modal-body">
+                    @if (selectedEmployee != null)
+                    {
+                        <dl class="row">
+                            <dt class="col-sm-4">Employee #</dt>
+                            <dd class="col-sm-8">@selectedEmployee.EmployeeNumber</dd>
+
+                            <dt class="col-sm-4">Name</dt>
+                            <dd class="col-sm-8">@($"{selectedEmployee.LastName}, {selectedEmployee.FirstName} {selectedEmployee.Initial}")</dd>
+
+                            <dt class="col-sm-4">Home Port</dt>
+                            <dd class="col-sm-8">@selectedEmployee.HomePort</dd>
+
+                            <dt class="col-sm-4">Class</dt>
+                            <dd class="col-sm-8">@selectedEmployee.Class</dd>
+
+                            <dt class="col-sm-4">Status</dt>
+                            <dd class="col-sm-8">@selectedEmployee.Status</dd>
+
+                            <dt class="col-sm-4">AI Status</dt>
+                            <dd class="col-sm-8">@selectedEmployee.AiStatus</dd>
+
+                            <dt class="col-sm-4">WES Regular</dt>
+                            <dd class="col-sm-8">@(selectedEmployee.WesRegular == true ? "Yes" : "No")</dd>
+
+                            <dt class="col-sm-4">Last Modified</dt>
+                            <dd class="col-sm-8">@(selectedEmployee.ModDate?.ToString("g") ?? "N/A") by @(selectedEmployee.ModUser ?? "N/A")</dd>
+                        </dl>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDetails">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private List<Employee>? _employees;
+    private Employee? selectedEmployee;
+    private bool showDetails;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _employees = await BCMEAContext.Employees
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .ToListAsync();
+    }
+
+    private void ViewDetails(Employee employee)
+    {
+        selectedEmployee = employee;
+        showDetails = true;
+    }
+
+    private void CloseDetails()
+    {
+        showDetails = false;
+        selectedEmployee = null;
+    }
+}

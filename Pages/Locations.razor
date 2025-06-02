@@ -1,0 +1,539 @@
+@page "/locations"
+@using AccessMigrationApp.Models.LockerDB
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject AccessMigrationApp.Data.LockerDB.LockerDbContext LockerDbContext
+@inject NavigationManager NavigationManager
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Locations</h3>
+    <button class="btn btn-primary" @onclick="() => ShowAddLocationModal()">
+        <span class="oi oi-plus"></span> Add Location
+    </button>
+</div>
+
+@if (_locations == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Category</label>
+            <select class="form-select" @bind="selectedCategory" @bind:event="oninput" @onchange="OnCategoryChanged">
+                <option value="VESSELS">Vessels</option>
+                <option value="YARDS">Yards</option>
+                <option value="DOCKS">Docks</option>
+                <option value="SUPPLIERS">Suppliers</option>
+                <option value="SHOPS">Shops</option>
+                <option value="GONE">Gone</option>
+                <option value="ACTIVE">All Active</option>
+                <option value="INACTIVE">Inactive</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Search</label>
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="Search locations..." 
+                       @bind="searchTerm" @bind:event="oninput" @onkeyup="FilterLocations" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">
+                    <span class="oi oi-x"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th style="cursor: pointer; border: 2px solid #0d6efd;" @onclick="@(() => SortBy("Location"))">
+                        Location
+                        <span class="oi @(GetSortIcon("Location"))"></span>
+                        <small class="text-muted ms-1">(@_filteredLocations?.FirstOrDefault()?.Id)</small>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Starts"))">
+                        Starts
+                        <span class="oi @(GetSortIcon("Starts"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Berth"))">
+                        Berth
+                        <span class="oi @(GetSortIcon("Berth"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Gear"))">
+                        Gear
+                        <span class="oi @(GetSortIcon("Gear"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Cargo"))">
+                        Cargo
+                        <span class="oi @(GetSortIcon("Cargo"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Supt"))">
+                        Supt
+                        <span class="oi @(GetSortIcon("Supt"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Foreman"))">
+                        Foreman
+                        <span class="oi @(GetSortIcon("Foreman"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Standby"))">
+                        Standby
+                        <span class="oi @(GetSortIcon("Standby"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Phone"))">
+                        Phone
+                        <span class="oi @(GetSortIcon("Phone"))"></span>
+                    </th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var location in _filteredLocations ?? Enumerable.Empty<Location>())
+                {
+                    <tr>
+                        <td class="location-cell" @onclick="() => ViewInventory(location)">@location.Name</td>
+                        <td>@(location.StartDate?.ToShortDateString() ?? "")</td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(location.Berth))
+                            {
+                                <span class="text-primary" style="cursor: pointer; text-decoration: none;" 
+                                      @onclick="@(() => NavigateToBerth(location.Berth))">
+                                    @location.Berth
+                                </span>
+                            }
+                            else
+                            {
+                                @location.Berth
+                            }
+                        </td>
+                        <td>@location.Gear</td>
+                        <td>@location.Cargo</td>
+                        <td>@location.Superintendent</td>
+                        <td>@location.Foreman</td>
+                        <td>@location.Standby</td>
+                        <td>@location.Phone</td>
+                        <td>
+                            <button class="btn btn-primary btn-sm" @onclick="() => EditLocation(location)">
+                                <span class="oi oi-pencil"></span>
+                            </button>
+                            <button class="btn btn-info btn-sm ms-1" @onclick="() => ViewInventory(location)">
+                                <span class="oi oi-list"></span>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="instruction-text">
+        Click location (blue box) to see Gear / Equipment List
+    </div>
+}
+
+@if (showLocationModal)
+{
+    <div class="modal fade show" style="display: block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(selectedLocation == null ? "Add Location" : "Edit Location")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseLocationModal"></button>
+                </div>
+                <EditForm Model="@editingLocation" OnValidSubmit="HandleLocationSubmit">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Name</label>
+                                <InputText @bind-Value="editingLocation.Name" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Type</label>
+                                <InputSelect @bind-Value="editingLocation.LocationType" class="form-select">
+                                    <option value="">Select Type</option>
+                                    @if (_locationTypes != null)
+                                    {
+                                        @foreach (var type in _locationTypes)
+                                        {
+                                            <option value="@type.Id">@type.Id</option>
+                                        }
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Start Date</label>
+                                <InputDate @bind-Value="editingLocation.StartDate" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Berth</label>
+                                <InputSelect @bind-Value="editingLocation.Berth" class="form-select">
+                                    <option value="">Select Berth</option>
+                                    @if (_berths != null)
+                                    {
+                                        @foreach (var berth in _berths)
+                                        {
+                                            <option value="@berth.Id">@berth.Name</option>
+                                        }
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Gear</label>
+                                <InputText @bind-Value="editingLocation.Gear" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Cargo</label>
+                                <InputText @bind-Value="editingLocation.Cargo" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Superintendent</label>
+                                <InputText @bind-Value="editingLocation.Superintendent" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Foreman</label>
+                                <InputText @bind-Value="editingLocation.Foreman" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Standby</label>
+                                <InputText @bind-Value="editingLocation.Standby" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Phone</label>
+                                <InputText @bind-Value="editingLocation.Phone" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label">Note</label>
+                                <InputTextArea @bind-Value="editingLocation.Note" class="form-control" rows="3" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseLocationModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+<style>
+    .location-cell {
+        border: 2px solid #0d6efd;
+        cursor: pointer;
+    }
+    .instruction-text {
+        color: #006400;
+        font-weight: bold;
+        margin-top: 1rem;
+        margin-left: 0.5rem;
+    }
+</style>
+
+@code {
+    private List<Location>? _locations;
+    private List<Location>? _filteredLocations;
+    private List<LocationType>? _locationTypes;
+    private List<Berth>? _berths;
+    private string searchTerm = "";
+    private string selectedCategory = "VESSELS"; // Set initial filter to vessels
+    private bool showLocationModal;
+    private Location? selectedLocation;
+    private Location editingLocation = new();
+    private string currentSortColumn = "Location";
+    private bool isAscending = true;
+    private string? secondarySortColumn;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            // Load locations with initial sorting
+            _locations = await LockerDbContext.Locations
+                .Include(l => l.Type)
+                .Include(l => l.BerthNavigation)
+                .OrderBy(l => l.Name)
+                .ThenByDescending(l => l.StartDate)
+                .ToListAsync();
+
+            _locationTypes = await LockerDbContext.LocationTypes.ToListAsync();
+            _berths = await LockerDbContext.Berths.Where(b => !b.IsArchived).OrderBy(b => b.Name).ToListAsync();
+
+            FilterLocations();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+        }
+    }
+
+    private void FilterLocations()
+    {
+        if (_locations == null) return;
+
+        var query = _locations.AsEnumerable();
+
+        // Apply category filter
+        switch (selectedCategory)
+        {
+            case "VESSELS":
+                query = query.Where(l => l.Finished != 1 && l.LocationType == "VESSEL");
+                break;
+            case "YARDS":
+                query = query.Where(l => l.Finished != 1 && l.LocationType == "YARD");
+                break;
+            case "DOCKS":
+                query = query.Where(l => l.Finished != 1 && l.LocationType == "DOCK");
+                break;
+            case "SUPPLIERS":
+                query = query.Where(l => l.Finished != 1 && l.LocationType == "SUPPLIER");
+                break;
+            case "SHOPS":
+                query = query.Where(l => l.Finished != 1 && l.LocationType == "SHOP");
+                break;
+            case "GONE":
+                query = query.Where(l => l.LocationType == "GONE");
+                break;
+            case "ACTIVE":
+                query = query.Where(l => l.Finished != 1);
+                break;
+            case "INACTIVE":
+                query = query.Where(l => l.Finished == 1);
+                break;
+        }
+
+        // Apply search filter
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            var search = searchTerm.Trim().ToLower();
+            query = query.Where(l => 
+                (l.Name?.ToLower().Contains(search) ?? false) ||
+                (l.LocationType?.ToLower().Contains(search) ?? false) ||
+                (l.Berth?.ToLower().Contains(search) ?? false) ||
+                (l.Gear?.ToLower().Contains(search) ?? false) ||
+                (l.Cargo?.ToLower().Contains(search) ?? false) ||
+                (l.Superintendent?.ToLower().Contains(search) ?? false) ||
+                (l.Foreman?.ToLower().Contains(search) ?? false) ||
+                (l.Standby?.ToLower().Contains(search) ?? false) ||
+                (l.Phone?.ToLower().Contains(search) ?? false) ||
+                (l.Note?.ToLower().Contains(search) ?? false)
+            );
+        }
+
+        // Apply sorting
+        query = ApplySort(query);
+
+        _filteredLocations = query.ToList();
+        StateHasChanged();
+    }
+
+    private IEnumerable<Location> ApplySort(IEnumerable<Location> query)
+    {
+        var orderedQuery = query;
+
+        // Primary sort
+        orderedQuery = ApplySortForColumn(orderedQuery, currentSortColumn, isAscending);
+
+        // Secondary sort based on column
+        if (currentSortColumn == "Location")
+        {
+            orderedQuery = ((IOrderedEnumerable<Location>)orderedQuery).ThenByDescending(l => l.StartDate);
+        }
+        else if (currentSortColumn == "Starts")
+        {
+            orderedQuery = ((IOrderedEnumerable<Location>)orderedQuery).ThenBy(l => l.Name);
+        }
+        else if (currentSortColumn == "Berth")
+        {
+            orderedQuery = ((IOrderedEnumerable<Location>)orderedQuery).ThenBy(l => l.Name)
+                .ThenByDescending(l => l.StartDate);
+        }
+        else if (currentSortColumn == "Gear")
+        {
+            orderedQuery = ((IOrderedEnumerable<Location>)orderedQuery).ThenBy(l => l.Name)
+                .ThenByDescending(l => l.StartDate);
+        }
+        else if (currentSortColumn == "Cargo")
+        {
+            orderedQuery = ((IOrderedEnumerable<Location>)orderedQuery).ThenBy(l => l.Name)
+                .ThenByDescending(l => l.StartDate);
+        }
+        else if (currentSortColumn == "Supt")
+        {
+            orderedQuery = ((IOrderedEnumerable<Location>)orderedQuery).ThenBy(l => l.Name)
+                .ThenByDescending(l => l.StartDate);
+        }
+        else if (currentSortColumn == "Foreman")
+        {
+            orderedQuery = ((IOrderedEnumerable<Location>)orderedQuery).ThenBy(l => l.Name)
+                .ThenByDescending(l => l.StartDate);
+        }
+
+        return orderedQuery;
+    }
+
+    private IOrderedEnumerable<Location> ApplySortForColumn(IEnumerable<Location> query, string columnName, bool ascending)
+    {
+        Func<Location, object?> sortSelector = columnName switch
+        {
+            "Location" => l => l.Name,
+            "Starts" => l => l.StartDate,
+            "Berth" => l => l.Berth,
+            "Gear" => l => l.Gear,
+            "Cargo" => l => l.Cargo,
+            "Supt" => l => l.Superintendent,
+            "Foreman" => l => l.Foreman,
+            "Standby" => l => l.Standby,
+            "Phone" => l => l.Phone,
+            _ => l => l.Name
+        };
+
+        return ascending ? query.OrderBy(sortSelector) : query.OrderByDescending(sortSelector);
+    }
+
+    private void SortBy(string columnName)
+    {
+        if (currentSortColumn == columnName)
+        {
+            // Toggle sort direction
+            isAscending = !isAscending;
+        }
+        else
+        {
+            // New column, set as primary sort
+            currentSortColumn = columnName;
+            isAscending = true;
+        }
+
+        FilterLocations();
+    }
+
+    private string GetSortIcon(string columnName)
+    {
+        if (currentSortColumn != columnName)
+            return "";
+
+        return isAscending ? "oi-caret-top" : "oi-caret-bottom";
+    }
+
+    private void OnCategoryChanged(ChangeEventArgs e)
+    {
+        selectedCategory = e.Value?.ToString() ?? "VESSELS";
+        FilterLocations();
+    }
+
+    private void ClearSearch()
+    {
+        searchTerm = "";
+        FilterLocations();
+    }
+
+    private void ShowAddLocationModal()
+    {
+        selectedLocation = null;
+        editingLocation = new Location();
+        showLocationModal = true;
+    }
+
+    private void EditLocation(Location location)
+    {
+        selectedLocation = location;
+        editingLocation = new Location
+        {
+            Id = location.Id,
+            Name = location.Name,
+            LocationType = location.LocationType,
+            StartDate = location.StartDate,
+            Berth = location.Berth,
+            Gear = location.Gear,
+            Cargo = location.Cargo,
+            Superintendent = location.Superintendent,
+            Foreman = location.Foreman,
+            Standby = location.Standby,
+            Phone = location.Phone,
+            Note = location.Note,
+            Consumed = location.Consumed,
+            Finished = location.Finished
+        };
+        showLocationModal = true;
+    }
+
+    private void ViewInventory(Location location)
+    {
+        // Navigate to the inventory view for this location
+        NavigationManager.NavigateTo($"/inventory/{location.Id}");
+    }
+
+    private async Task HandleLocationSubmit()
+    {
+        try
+        {
+            if (selectedLocation == null)
+            {
+                editingLocation.AddDate = DateTime.Now;
+                editingLocation.AddUser = "SYSTEM"; // TODO: Get current user
+                LockerDbContext.Locations.Add(editingLocation);
+            }
+            else
+            {
+                var location = await LockerDbContext.Locations.FindAsync(selectedLocation.Id);
+                if (location != null)
+                {
+                    location.Name = editingLocation.Name;
+                    location.LocationType = editingLocation.LocationType;
+                    location.StartDate = editingLocation.StartDate;
+                    location.Berth = editingLocation.Berth;
+                    location.Gear = editingLocation.Gear;
+                    location.Cargo = editingLocation.Cargo;
+                    location.Superintendent = editingLocation.Superintendent;
+                    location.Foreman = editingLocation.Foreman;
+                    location.Standby = editingLocation.Standby;
+                    location.Phone = editingLocation.Phone;
+                    location.Note = editingLocation.Note;
+                    location.ModDate = DateTime.Now;
+                    location.ModUser = "SYSTEM"; // TODO: Get current user
+                }
+            }
+
+            await LockerDbContext.SaveChangesAsync();
+            await LoadData();
+            CloseLocationModal();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving location: {ex.Message}");
+        }
+    }
+
+    private void CloseLocationModal()
+    {
+        showLocationModal = false;
+        selectedLocation = null;
+        editingLocation = new Location();
+    }
+
+    private void NavigateToBerth(string berthId)
+    {
+        if (!string.IsNullOrEmpty(berthId))
+        {
+            NavigationManager.NavigateTo($"/berths/{berthId}");
+        }
+    }
+}

@@ -1,0 +1,147 @@
+@page "/inventory/edit/{Id}"
+@using AccessMigrationApp.Models.LockerDB
+@using AccessMigrationApp.Models.ViewModels
+@using Microsoft.EntityFrameworkCore
+@inject LockerDbContext LockerDbContext
+@inject NavigationManager NavigationManager
+
+<h3>Edit Inventory Item</h3>
+
+@if (viewModel == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="@viewModel" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group mb-3">
+            <label for="id">ID</label>
+            <input id="id" class="form-control" @bind="viewModel.Id" readonly />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="name">Name</label>
+            <input id="name" class="form-control" @bind="viewModel.Name" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="description">Description</label>
+            <input id="description" class="form-control" @bind="viewModel.Description" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="invType">Type</label>
+            <select id="invType" class="form-select" @bind="viewModel.InvType">
+                <option value="EQUIP">Equipment</option>
+                <option value="GEAR">Gear</option>
+                <option value="TOOLS">Tools</option>
+                <option value="MATRL">Materials</option>
+            </select>
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="class">Class</label>
+            <input id="class" class="form-control" @bind="viewModel.Class" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="standardCost">Standard Cost</label>
+            <input id="standardCost" type="number" step="0.01" class="form-control" @bind="viewModel.StandardCost" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="process">Process</label>
+            <input id="process" class="form-control" @bind="viewModel.Process" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="testClass">Test Class</label>
+            <input id="testClass" class="form-control" @bind="viewModel.TestClass" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label>
+                <input type="checkbox" @bind="isActive" />
+                Active
+            </label>
+        </div>
+
+        <div class="form-group mb-3">
+            <label>
+                <input type="checkbox" @bind="isBillable" />
+                Billable
+            </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    private Models.LockerDB.Inventory? item;
+    private InventoryViewModel? viewModel;
+    private bool isActive;
+    private bool isBillable;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(Id))
+        {
+            var decodedId = Uri.UnescapeDataString(Id);
+            Console.WriteLine($"Loading inventory with ID: {decodedId} (encoded was: {Id})");
+            item = await LockerDbContext.Inventories.FindAsync(decodedId);
+            if (item != null)
+            {
+                viewModel = InventoryViewModel.FromModel(item);
+                isActive = item.Active == 1;
+                isBillable = item.Billable == 1;
+            }
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (item != null && viewModel != null)
+        {
+            try
+            {
+                // Update the model from view model
+                item.Name = viewModel.Name;
+                item.Description = viewModel.Description;
+                item.InvType = viewModel.InvType;
+                item.Class = string.IsNullOrEmpty(viewModel.Class) ? viewModel.InvType : viewModel.Class;
+                item.StandardCost = viewModel.StandardCost;
+                item.Process = viewModel.Process;
+                item.TestClass = viewModel.TestClass;
+                item.Active = (short)(isActive ? 1 : 0);
+                item.Billable = (short)(isBillable ? 1 : 0);
+
+                // Explicitly mark the entity as modified
+                LockerDbContext.Entry(item).State = EntityState.Modified;
+                
+                // Save changes
+                await LockerDbContext.SaveChangesAsync();
+                
+                // Navigate back to inventory page
+                NavigationManager.NavigateTo("/inventory");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving changes: {ex.Message}");
+                // You might want to show an error message to the user here
+            }
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo("/inventory");
+    }
+}

@@ -1,0 +1,351 @@
+@page "/inventory"
+@using AccessMigrationApp.Models.LockerDB
+@using AccessMigrationApp.Models.ViewModels
+@using Microsoft.EntityFrameworkCore
+@inject LockerDbContext LockerDbContext
+@inject NavigationManager NavigationManager
+
+<h3>Inventory List</h3>
+
+@if (_inventoryItems == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Filter by Type</label>
+            <select class="form-select" @onchange="OnTypeChanged">
+                <option value="">All Types</option>
+                <option value="EQUIP">Equipment</option>
+                <option value="GEAR">Gear</option>
+                <option value="TOOLS">Tools</option>
+                <option value="MATRL">Materials</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Search</label>
+            <input type="text" class="form-control" placeholder="Search by ID, Name, Description, Class, or Type" @bind="searchTerm" @bind:event="oninput" @onkeyup="OnSearchChanged" />
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("ID"))">
+                        ID
+                        <span class="oi @(GetSortIcon("ID"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Name"))">
+                        Name
+                        <span class="oi @(GetSortIcon("Name"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Description"))">
+                        Description
+                        <span class="oi @(GetSortIcon("Description"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Type"))">
+                        Type
+                        <span class="oi @(GetSortIcon("Type"))"></span>
+                    </th>
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Class"))">
+                        Class
+                        <span class="oi @(GetSortIcon("Class"))"></span>
+                    </th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _inventoryItems)
+                {
+                    <tr>
+                        <td>@item.Id</td>
+                        <td>@item.Name</td>
+                        <td>@item.Description</td>
+                        <td>
+                            <select class="form-select form-select-sm" @bind="item.InvType" @bind:after="@(() => UpdateType(item))">
+                                <option value="EQUIP">EQUIP</option>
+                                <option value="GEAR">GEAR</option>
+                                <option value="TOOLS">TOOLS</option>
+                                <option value="MATRL">MATRL</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input class="form-control form-control-sm" @bind="item.Class" @bind:after="@(() => UpdateClass(item))" />
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-sm" @onclick="() => NavigateToEdit(item.Id)">
+                                <span class="oi oi-pencil"></span>
+                            </button>
+                            <button class="btn btn-info btn-sm ms-1" @onclick="() => ViewItemLocations(item)">
+                                <span class="oi oi-location"></span>
+                            </button>
+                            @if (!string.IsNullOrEmpty(item.TestClass))
+                            {
+                                <button class="btn btn-warning btn-sm ms-1" @onclick="() => ViewTestHistory(item.Id)">
+                                    <span class="oi oi-timer"></span>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showLocations)
+{
+    <div class="modal fade show" style="display: block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Item Locations</h5>
+                    <button type="button" class="btn-close" @onclick="CloseLocationsModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (selectedLocations?.Any() == true)
+                    {
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Location</th>
+                                    <th>Description</th>
+                                    <th>On Hand</th>
+                                    <th>Issued</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var loc in selectedLocations)
+                                {
+                                    <tr>
+                                        <td>@(loc.Location?.Name ?? "Unknown")</td>
+                                        <td>@loc.Description</td>
+                                        <td>@loc.OnHand</td>
+                                        <td>@loc.Issued</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <p>No locations found for this item.</p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseLocationsModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private List<string> _itemTypes = new() { "EQUIP", "GEAR", "TOOLS", "MATRL" };
+    private List<InventoryViewModel>? _inventoryItems;
+    private List<InventoryViewModel>? _allInventoryItems;
+    private List<InventoryLocation>? selectedLocations;
+    private bool showLocations;
+    private string selectedType = "";
+    private string searchTerm = "";
+    private string currentSortColumn = "ID";
+    private bool isAscending = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInventory();
+    }
+
+    private async Task LoadInventory()
+    {
+        var items = await LockerDbContext.Inventories
+            .Where(i => i.Active == 1)
+            .OrderBy(i => i.Id)
+            .ToListAsync();
+
+        // Ensure Class is set for items where it's empty
+        foreach (var item in items)
+        {
+            if (string.IsNullOrEmpty(item.Class))
+            {
+                item.Class = item.InvType;
+                await LockerDbContext.SaveChangesAsync();
+            }
+            Console.WriteLine($"Item {item.Id}: Type={item.InvType}, Class={item.Class}");
+        }
+
+        _allInventoryItems = items.Select(i => InventoryViewModel.FromModel(i)).ToList();
+
+        // Verify the viewmodel values
+        foreach (var item in _allInventoryItems)
+        {
+            Console.WriteLine($"ViewModel {item.Id}: Type={item.InvType}, Class={item.Class}");
+        }
+
+        FilterInventory();
+    }
+
+    private void FilterInventory()
+    {
+        if (_allInventoryItems == null) return;
+
+        var query = _allInventoryItems.AsEnumerable();
+
+        // Apply type filter
+        if (!string.IsNullOrEmpty(selectedType))
+        {
+            query = query.Where(i => i.InvType == selectedType);
+        }
+
+        // Apply search filter
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            var search = searchTerm.Trim().ToLower();
+            query = query.Where(i => 
+                (i.Id?.ToLower().Contains(search) ?? false) ||
+                (i.Name?.ToLower().Contains(search) ?? false) ||
+                (i.Description?.ToLower().Contains(search) ?? false) ||
+                (i.Class?.ToLower().Contains(search) ?? false) ||
+                (i.InvType?.ToLower().Contains(search) ?? false)
+            );
+        }
+
+        // Apply sorting
+        query = ApplySort(query);
+
+        _inventoryItems = query.ToList();
+        StateHasChanged();
+    }
+
+    private IEnumerable<InventoryViewModel> ApplySort(IEnumerable<InventoryViewModel> query)
+    {
+        var orderedQuery = query;
+
+        // Primary sort
+        orderedQuery = ApplySortForColumn(orderedQuery, currentSortColumn, isAscending);
+
+        // Secondary sort based on column
+        if (currentSortColumn != "ID")
+        {
+            orderedQuery = ((IOrderedEnumerable<InventoryViewModel>)orderedQuery).ThenBy(i => i.Id);
+        }
+
+        return orderedQuery;
+    }
+
+    private IOrderedEnumerable<InventoryViewModel> ApplySortForColumn(IEnumerable<InventoryViewModel> query, string columnName, bool ascending)
+    {
+        Func<InventoryViewModel, object?> sortSelector = columnName switch
+        {
+            "ID" => i => i.Id,
+            "Name" => i => i.Name,
+            "Description" => i => i.Description,
+            "Type" => i => i.InvType,
+            "Class" => i => i.Class,
+            _ => i => i.Id
+        };
+
+        return ascending ? query.OrderBy(sortSelector) : query.OrderByDescending(sortSelector);
+    }
+
+    private void SortBy(string columnName)
+    {
+        if (currentSortColumn == columnName)
+        {
+            // Toggle sort direction
+            isAscending = !isAscending;
+        }
+        else
+        {
+            // New column, set as primary sort
+            currentSortColumn = columnName;
+            isAscending = true;
+        }
+
+        FilterInventory();
+    }
+
+    private string GetSortIcon(string columnName)
+    {
+        if (currentSortColumn != columnName)
+            return "";
+
+        return isAscending ? "oi-caret-top" : "oi-caret-bottom";
+    }
+
+    private void OnTypeChanged(ChangeEventArgs e)
+    {
+        selectedType = e.Value?.ToString() ?? "";
+        FilterInventory();
+    }
+
+    private void OnSearchChanged()
+    {
+        FilterInventory();
+    }
+
+    private async Task UpdateClass(InventoryViewModel item)
+    {
+        Console.WriteLine($"UpdateClass called for item {item.Id}, new class value: {item.Class}");
+        var inventoryItem = await LockerDbContext.Inventories.FindAsync(item.Id);
+        if (inventoryItem != null)
+        {
+            Console.WriteLine($"Found inventory item, current class value: {inventoryItem.Class}");
+            if (string.IsNullOrEmpty(item.Class))
+            {
+                Console.WriteLine("Class value is empty, using InvType as default");
+                item.Class = item.InvType;
+            }
+            inventoryItem.Class = item.Class;
+            await LockerDbContext.SaveChangesAsync();
+            Console.WriteLine($"Saved new class value: {inventoryItem.Class}");
+            StateHasChanged();
+        }
+        else
+        {
+            Console.WriteLine($"Could not find inventory item with ID {item.Id}");
+        }
+    }
+
+    private async Task UpdateType(InventoryViewModel item)
+    {
+        var inventoryItem = await LockerDbContext.Inventories.FindAsync(item.Id);
+        if (inventoryItem != null)
+        {
+            inventoryItem.InvType = item.InvType;
+            await LockerDbContext.SaveChangesAsync();
+        }
+    }
+
+    private void NavigateToEdit(string id)
+    {
+        LockerDbContext.ChangeTracker.Clear();
+        var encodedId = Uri.EscapeDataString(id);
+        Console.WriteLine($"Navigating to edit with ID: {id}, encoded: {encodedId}");
+        NavigationManager.NavigateTo($"/inventory/edit/{encodedId}");
+    }
+
+    private async Task ViewItemLocations(InventoryViewModel item)
+    {
+        selectedLocations = await LockerDbContext.InventoryLocations
+            .Include(il => il.Location)
+            .Where(il => il.ItemId == item.Id)
+            .ToListAsync();
+        showLocations = true;
+    }
+
+    private void ViewTestHistory(string id)
+    {
+        NavigationManager.NavigateTo($"/inventory/tests/{id}");
+    }
+
+    private void CloseLocationsModal()
+    {
+        showLocations = false;
+        selectedLocations = null;
+    }
+}

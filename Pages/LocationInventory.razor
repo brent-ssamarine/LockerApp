@@ -1,0 +1,143 @@
+@page "/inventory/{LocationId:int}"
+@using AccessMigrationApp.Models.LockerDB
+@using AccessMigrationApp.Models.ViewModels
+@using Microsoft.EntityFrameworkCore
+@inject LockerDbContext LockerDbContext
+@inject NavigationManager NavigationManager
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Location Inventory - @(location?.Name ?? "Loading...")</h3>
+    <button class="btn btn-secondary" @onclick="GoBack">
+        <span class="oi oi-arrow-left"></span> Back to Locations
+    </button>
+</div>
+
+@if (location == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <p><strong>Type:</strong> @location.LocationType</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Line:</strong> @location.LineId</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Berth:</strong> @location.Berth</p>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(location.Note))
+            {
+                <p><strong>Note:</strong> @location.Note</p>
+            }
+        </div>
+    </div>
+
+    @if (inventoryLocations == null)
+    {
+        <p><em>Loading inventory...</em></p>
+    }
+    else if (!inventoryLocations.Any())
+    {
+        <div class="alert alert-info">
+            No inventory items found at this location.
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Type</th>
+                        <th>On Hand</th>
+                        <th>Issued</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in inventoryLocations)
+                    {
+                        <tr>
+                            <td>@item.ItemId</td>
+                            <td>@item.ItemName</td>
+                            <td>@item.Description</td>
+                            <td>@(item.Inventory?.InvType ?? "")</td>
+                            <td>@item.OnHand</td>
+                            <td>@item.Issued</td>
+                            <td>
+                                <button class="btn btn-primary btn-sm" @onclick="() => NavigateToEdit(item.ItemId)">
+                                    <span class="oi oi-pencil"></span>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int LocationId { get; set; }
+
+    private Location? location;
+    private List<InventoryLocation>? inventoryLocations;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            // Load location details
+            location = await LockerDbContext.Locations
+                .FirstOrDefaultAsync(l => l.Id == LocationId);
+
+            if (location != null)
+            {
+                // Load inventory items for this location
+                inventoryLocations = await LockerDbContext.InventoryLocations
+                    .Include(il => il.Inventory)
+                    .Where(il => il.LocationId == LocationId)
+                    .OrderBy(il => il.ItemName)
+                    .ToListAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading location inventory: {ex.Message}");
+        }
+    }
+
+    private void NavigateToEdit(string? itemId)
+    {
+        if (!string.IsNullOrEmpty(itemId))
+        {
+            var encodedId = Uri.EscapeDataString(itemId);
+            NavigationManager.NavigateTo($"/inventory/edit/{encodedId}");
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/locations");
+    }
+} 

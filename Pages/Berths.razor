@@ -1,0 +1,212 @@
+@page "/berths"
+@page "/berths/{SelectedBerthId}"
+@using AccessMigrationApp.Data.LockerDB
+@using AccessMigrationApp.Models.LockerDB
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@inject LockerDbContext LockerDbContext
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<PageTitle>Berths Management</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Berths Management</h3>
+    <button class="btn btn-secondary" @onclick="GoBack">
+        <span class="oi oi-arrow-left"></span> Back to Locations
+    </button>
+</div>
+
+<div class="row mb-3">
+    <div class="col">
+        <button class="btn btn-primary" @onclick="() => OpenBerthModal(null)">Add New Berth</button>
+    </div>
+    <div class="col-md-4">
+        <input type="text" class="form-control" placeholder="Search berths..." @bind="searchTerm" @bind:event="oninput" @onkeyup="FilterBerths" />
+    </div>
+</div>
+
+@if (berths == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Port</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>                @foreach (var berth in filteredBerths ?? Enumerable.Empty<Berth>())
+                {
+                    <tr id="@($"berth-{berth.Id}")" class="@(berth.Id == SelectedBerthId ? "table-primary" : "")">
+                        <td>@berth.Id</td>
+                        <td>@berth.Name</td>
+                        <td>@berth.Port</td>
+                        <td>@(berth.IsArchived ? "Archived" : "Active")</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary me-2" @onclick="() => OpenBerthModal(berth)">Edit</button>
+                            <button class="btn btn-sm @(berth.IsArchived ? "btn-success" : "btn-warning")" 
+                                    @onclick="() => ToggleArchiveStatus(berth)">
+                                @(berth.IsArchived ? "Activate" : "Archive")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showBerthModal)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(selectedBerth == null ? "Add New Berth" : "Edit Berth")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseBerthModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@editingBerth" OnValidSubmit="HandleBerthSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label for="berthId" class="form-label">Berth ID</label>
+                            <InputText id="berthId" class="form-control" @bind-Value="editingBerth.Id" disabled="@(selectedBerth != null)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Name</label>
+                            <InputText id="name" class="form-control" @bind-Value="editingBerth.Name" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="port" class="form-label">Port</label>
+                            <InputText id="port" class="form-control" @bind-Value="editingBerth.Port" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CloseBerthModal">Cancel</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter]
+    public string? SelectedBerthId { get; set; }
+    private List<Berth>? berths;
+    private List<Berth>? filteredBerths;
+    private bool showBerthModal;
+    private Berth? selectedBerth;
+    private Berth editingBerth = new();
+    private string? searchTerm;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(SelectedBerthId) && berths != null)
+        {
+            // Find and scroll to the selected berth
+            var berth = berths.FirstOrDefault(b => b.Id == SelectedBerthId);
+            if (berth != null)
+            {
+                await ScrollToBerth(berth.Id);
+            }
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/locations");
+    }
+
+    private async Task ScrollToBerth(string berthId)
+    {
+        // Add a small delay to ensure the DOM is ready
+        await Task.Delay(100);
+        await JS.InvokeVoidAsync("scrollToElement", $"berth-{berthId}");
+    }
+
+    private async Task LoadData()
+    {
+        berths = await LockerDbContext.Berths
+            .OrderBy(b => b.IsArchived)
+            .ThenBy(b => b.Id)
+            .ToListAsync();
+        FilterBerths();
+    }
+
+    private void FilterBerths()
+    {
+        filteredBerths = berths?
+            .Where(b => string.IsNullOrEmpty(searchTerm) ||
+                       b.Id.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                       (b.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                       (b.Port?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
+    }
+
+    private void OpenBerthModal(Berth? berth)
+    {
+        selectedBerth = berth;
+        editingBerth = berth == null ? new Berth() : new Berth
+        {
+            Id = berth.Id,
+            Name = berth.Name,
+            Port = berth.Port,
+            IsArchived = berth.IsArchived
+        };
+        showBerthModal = true;
+    }
+
+    private void CloseBerthModal()
+    {
+        showBerthModal = false;
+        selectedBerth = null;
+        editingBerth = new();
+    }
+
+    private async Task HandleBerthSubmit()
+    {
+        if (selectedBerth == null)
+        {
+            LockerDbContext.Berths.Add(editingBerth);
+        }
+        else
+        {
+            var berth = await LockerDbContext.Berths.FindAsync(selectedBerth.Id);
+            if (berth != null)
+            {
+                berth.Name = editingBerth.Name;
+                berth.Port = editingBerth.Port;
+            }
+        }
+
+        await LockerDbContext.SaveChangesAsync();
+        await LoadData();
+        CloseBerthModal();
+    }
+
+    private async Task ToggleArchiveStatus(Berth berth)
+    {
+        berth.IsArchived = !berth.IsArchived;
+        await LockerDbContext.SaveChangesAsync();
+        await LoadData();
+    }
+}
