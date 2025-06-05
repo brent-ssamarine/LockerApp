@@ -41,7 +41,17 @@ else
         <table class="table">
             <thead>
                 <tr>
-                    <th>Item</th>
+                    <th>
+                        <div class="d-flex align-items-center" @onclick="() => SortData()">
+                            Item
+                            <span class="ms-1">
+                                @if (currentSortField == "ItemName")
+                                {
+                                    <span class="oi @(isAscending ? "oi-caret-top" : "oi-caret-bottom")"></span>
+                                }
+                            </span>
+                        </div>
+                    </th>
                     <th>Billable</th>
                     <th>Note</th>
                     <th>Onhand</th>
@@ -308,6 +318,11 @@ else
         padding-top: 0.25rem;
         padding-bottom: 0.25rem;
     }
+
+    .table th div {
+        cursor: pointer;
+        user-select: none;
+    }
     
     .form-select, .form-control, .location-select {
         font-family: Consolas, monospace;
@@ -373,6 +388,9 @@ else
     private string? selectedAsOfDateString;
 
     private bool CanPrint => !string.IsNullOrEmpty(selectedPrintLocation);
+
+    private bool isAscending = true;
+    private string currentSortField = "ItemName";
 
     protected override async Task OnInitializedAsync()
     {
@@ -743,5 +761,20 @@ else
         currentPage = page;
         UpdateDisplayedItems();
         StateHasChanged();
+    }
+
+    private void SortData()
+    {
+        isAscending = currentSortField == "ItemName" ? !isAscending : true;
+        currentSortField = "ItemName";
+
+        if (inventoryItems != null)
+        {
+            inventoryItems = isAscending 
+                ? inventoryItems.OrderBy(x => x.ItemName).ToList()
+                : inventoryItems.OrderByDescending(x => x.ItemName).ToList();
+            UpdateDisplayedItems();
+            StateHasChanged();
+        }
     }
 }
