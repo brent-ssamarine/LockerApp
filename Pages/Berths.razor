@@ -11,7 +11,7 @@
 <PageTitle>Berths Management</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3>Berths Management</h3>
+<h3>Berths Management</h3>
     <button class="btn btn-secondary" @onclick="GoBack">
         <span class="oi oi-arrow-left"></span> Back to Locations
     </button>
@@ -112,22 +112,28 @@ else
     private Berth? selectedBerth;
     private Berth editingBerth = new();
     private string? searchTerm;
+    private bool shouldScroll;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
     }
 
-    protected override async Task OnParametersSetAsync()
+    protected override void OnParametersSet()
     {
         if (!string.IsNullOrEmpty(SelectedBerthId) && berths != null)
         {
-            // Find and scroll to the selected berth
-            var berth = berths.FirstOrDefault(b => b.Id == SelectedBerthId);
-            if (berth != null)
-            {
-                await ScrollToBerth(berth.Id);
-            }
+            // Mark that we should scroll after render
+            shouldScroll = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldScroll && !string.IsNullOrEmpty(SelectedBerthId))
+        {
+            shouldScroll = false;
+            await ScrollToBerth(SelectedBerthId);
         }
     }
 

@@ -1,0 +1,112 @@
+@inject IJSRuntime JSRuntime
+
+@if (IsVisible)
+{
+    <div class="pdf-viewer show">
+        <div class="pdf-viewer-content">
+            <div class="pdf-viewer-header">
+                <h3>@Title</h3>
+                <div class="header-buttons">
+                    <button type="button" class="btn btn-primary me-2" @onclick="DownloadPdf">Download</button>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+            </div>
+            <div class="pdf-container">
+                <object data="@PdfUrl" type="application/pdf" width="100%" height="100%">
+                    <embed src="@PdfUrl" type="application/pdf" width="100%" height="100%" />
+                </object>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .pdf-viewer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .pdf-viewer-content {
+        background: white;
+        width: 90%;
+        height: 90%;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pdf-viewer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .pdf-viewer-header h3 {
+        margin: 0;
+    }
+
+    .header-buttons {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .pdf-container {
+        flex-grow: 1;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    object, embed {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "PDF Viewer";
+
+    [Parameter]
+    public string PdfUrl { get; set; } = "";
+
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> IsVisibleChanged { get; set; }
+
+    private async Task Close()
+    {
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+    }
+
+    private async Task DownloadPdf()
+    {
+        if (!string.IsNullOrEmpty(PdfUrl))
+        {
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+                const link = document.createElement('a');
+                link.href = '{PdfUrl}';
+                link.download = 'document.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            ");
+        }
+    }
+} 

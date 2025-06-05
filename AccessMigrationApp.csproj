@@ -18,7 +18,25 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="QuestPDF" Version="2025.5.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Reports\JobListDocument.cs" />
+    <Compile Remove="Reports\MaterialListDocument.cs" />
+    <Compile Remove="Reports\RecapDocument.cs" />
+    <Compile Remove="Reports\RecapInspectedBySubDocument.cs" />
+    <Compile Remove="Reports\TestSchedulerDocument.cs" />
+    <Compile Remove="Reports\Pending\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="Reports\Pending\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Reports\Pending\**" />
   </ItemGroup>
 
 </Project>

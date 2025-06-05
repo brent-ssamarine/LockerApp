@@ -1,0 +1,292 @@
+@using AccessMigrationApp.Models.ViewModels
+@using AccessMigrationApp.Models.LockerDB
+@using Microsoft.EntityFrameworkCore
+@inject LockerDbContext LockerDbContext
+
+<style>
+    .location-select option {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+</style>
+
+@if (Show)
+{
+    <div class="modal fade show" style="display: block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Move Inventory</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="OnClose"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Item</label>
+                        <input type="text" class="form-control" value="@ItemName" readonly />
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex">
+                            <div class="flex-grow-1">
+                                <input type="text" class="form-control" value="@Quantity" readonly />
+                            </div>
+                            <div class="ms-2">
+                                <span>@("@ " + FromLocation)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Note</label>
+                        <input type="text" class="form-control" @bind="Note" />
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Transfer</label>
+                            <div class="d-flex">
+                                <input type="number" class="form-control" @bind="TransferQuantity" />
+                                <span class="ms-2">to</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">&nbsp;</label>
+                            <select class="form-select location-select" @bind="ToLocation">
+                                <option value="">Select...</option>
+                                @if (locations != null)
+                                {
+                                    @foreach (var loc in locations)
+                                    {
+                                        <option value="@loc.LocationId">@loc.LocationId.ToString().PadRight(5, '\u00A0')│ @loc.Name</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Taken From</label>
+                            <select class="form-select" @bind="TakenFrom">
+                                <option value="">Select...</option>
+                                @if (takenFromOptions != null)
+                                {
+                                    @foreach (var type in takenFromOptions)
+                                    {
+                                        <option value="@type">@type</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">as of</label>
+                            <select class="form-select" @bind="SelectedAsOfDateString">
+                                <option value="">Select...</option> // Added this line
+                                @if (asOfDateOptions != null && asOfDateOptions.Any())
+                                {
+                                    @foreach (var dateStr in asOfDateOptions)
+                                    {
+                                        <option value="@dateStr">@dateStr</option>
+                                    }
+                                }
+                                else if (asOfDateOptions != null) // Only show if list is initialized but empty
+                                {
+                                    <option value="" disabled>No dates available</option>
+                                }
+                                else // asOfDateOptions is null (still loading or error before list initialization)
+                                {
+                                    <option value="" disabled>Loading dates...</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Inspected By</label>
+                        <textarea class="form-control" @bind="InspectedBy" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @onclick="HandleMove">Move</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter]
+    public bool Show { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> ShowChanged { get; set; }
+
+    [Parameter]
+    public string ItemName { get; set; } = "";
+
+    [Parameter]
+    public string FromLocation { get; set; } = "";
+
+    [Parameter]
+    public double Quantity { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnMoveCompleted { get; set; }
+
+    
+    [Parameter]
+    public string Description { get; set; } = "";
+    
+    private string Note { get; set; } = "";
+    private double TransferQuantity { get; set; }
+    private string? ToLocation { get; set; }
+    private string? TakenFrom { get; set; }
+    private DateTime AsOfDate { get; set; } = DateTime.Today;
+    private string InspectedBy { get; set; } = "";
+    private List<LocationViewModel>? locations;
+    private List<string>? takenFromOptions;
+    private List<string>? asOfDateOptions;
+
+    private string? _selectedAsOfDateString;
+    private string? SelectedAsOfDateString
+    {
+        get => _selectedAsOfDateString;
+        set
+        {
+            _selectedAsOfDateString = value;
+            if (DateTime.TryParseExact(value, "MM/dd/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsedDate))
+            {
+                AsOfDate = parsedDate;
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Note = Description ?? string.Empty; // Always set the note from description
+        TransferQuantity = Quantity; // Always set transfer quantity from Quantity
+        ToLocation = null; // Reset ToLocation each time
+        TakenFrom = null; // Reset TakenFrom
+        await LoadLocations();
+        await LoadTakenFromOptionsAsync();
+        await LoadAsOfDateOptionsAsync();
+
+        // Reset SelectedAsOfDateString to allow for no default selection
+        SelectedAsOfDateString = null;
+        AsOfDate = default; // Or DateTime.MinValue if you prefer for unselected state
+    }
+
+    private async Task LoadLocations()
+    {
+        try
+        {
+            // Get the current location ID from the parent component
+            var currentLocation = await LockerDbContext.Locations
+                .FirstOrDefaultAsync(l => l.Name == FromLocation);
+                
+            if (currentLocation != null)
+            {
+                locations = await LockerDbContext.Locations
+                    .Where(l => l.Id != currentLocation.Id &&  // Not the current location
+                               l.Finished != 1 &&              // Not finished
+                               l.LocationType != "SUPPLIER" &&   // Not a supplier
+                               l.LocationType != null   ) 
+                    .OrderBy(l => l.Name)
+                    .Select(l => new LocationViewModel 
+                    { 
+                        LocationId = l.Id,
+                        Name = l.Name ?? ""
+                    })
+                    .ToListAsync();
+            }
+            else
+            {
+                // Fallback in case current location is not found
+                locations = await LockerDbContext.Locations
+                    .Where(l => l.Finished != 1 &&
+                               l.LocationType != "SUPPLIER" &&
+                               l.LocationType != null)
+                    .OrderBy(l => l.Name)
+                    .Select(l => new LocationViewModel 
+                    { 
+                        LocationId = l.Id,
+                        Name = l.Name ?? ""
+                    })
+                    .ToListAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading locations: {ex.Message}");
+        }
+    }
+
+    private async Task LoadTakenFromOptionsAsync()
+    {
+        try
+        {
+            var locationTypes = await LockerDbContext.Locations
+                .Select(l => l.LocationType)
+                .Where(lt => lt != null)
+                .Distinct()
+                .ToListAsync();
+
+            takenFromOptions = new List<string>();
+            takenFromOptions.AddRange(locationTypes.Where(lt => lt != null)!); // Ensure no nulls are added
+            takenFromOptions = takenFromOptions.OrderBy(x => x).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading 'Taken From' options: {ex.Message}");
+            takenFromOptions = new List<string> { "STOCK", "RENTAL", "Error Loading Types" };
+        }
+    }
+
+    private async Task LoadAsOfDateOptionsAsync()
+    {
+        try
+        {
+            // Get distinct dates from TwoWeeks table
+            var dates = await LockerDbContext.TwoWeeks
+                .Select(t => t.SelectDate)
+                .Distinct()
+                .OrderByDescending(d => d)
+                .Select(d => d.ToString("MM/dd/yyyy"))
+                .ToListAsync();
+
+            // Add today's date if not already present
+            var today = DateTime.Today.ToString("MM/dd/yyyy");
+            if (!dates.Contains(today))
+            {
+                dates.Insert(0, today);
+            }
+
+            // If no dates found, add today's date
+            if (!dates.Any())
+            {
+                dates.Add(today);
+            }
+
+            asOfDateOptions = dates;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading 'as of' date options: {ex.Message}");
+            // Fallback to today's date if there's an error
+            asOfDateOptions = new List<string> { DateTime.Today.ToString("MM/dd/yyyy") };
+        }
+    }
+
+    private async Task HandleMove()
+    {
+        // TODO: Implement the move logic here
+        await OnMoveCompleted.InvokeAsync(true);
+        await OnClose();
+    }
+
+    private async Task OnClose()
+    {
+        Show = false;
+        await ShowChanged.InvokeAsync(Show);
+    }
+} 

@@ -400,3 +400,43 @@ public class TwoWeek
     [Column("selectdate")]
     public DateTime SelectDate { get; set; }
 }
+
+[Keyless]
+[Table("inventory_onsite")]
+public class InventoryOnsite
+{
+    [Column("item")]
+    public string? Item { get; set; }
+    
+    [Column("item_name")]
+    public string? ItemName { get; set; }
+    
+    [Column("description")]
+    public string? Description { get; set; }
+    
+    [Column("inv_type")]
+    public string? InvType { get; set; }
+    
+    [Column("class")]
+    public string? Class { get; set; }
+    
+    [Column("invloc_id")]
+    public int? LocationId { get; set; }
+    
+    [Column("loc_name")]
+    public string? LocationName { get; set; }
+    
+    [Column("on_hand")]
+    public double? OnHand { get; set; }
+    
+    [Column("issued")]
+    public double? Issued { get; set; }
+    
+    [Column("billable")]
+    public short? Billable { get; set; }
+    
+    [Column("active")]
+    public short? Active { get; set; }
+    [Column("finished")]
+    public short? Finished { get; set; }
+}

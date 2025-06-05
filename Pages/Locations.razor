@@ -48,7 +48,7 @@ else
         <table class="table table-striped">
             <thead>
                 <tr>
-                    <th style="cursor: pointer; border: 2px solid #0d6efd;" @onclick="@(() => SortBy("Location"))">
+                    <th style="cursor: pointer" @onclick="@(() => SortBy("Location"))">
                         Location
                         <span class="oi @(GetSortIcon("Location"))"></span>
                         <small class="text-muted ms-1">(@_filteredLocations?.FirstOrDefault()?.Id)</small>
@@ -92,15 +92,14 @@ else
                 @foreach (var location in _filteredLocations ?? Enumerable.Empty<Location>())
                 {
                     <tr>
-                        <td class="location-cell" @onclick="() => ViewInventory(location)">@location.Name</td>
+                        <td class="location-cell text-primary" @onclick="() => ViewInventory(location)" title="Click location #@location.Id to see Gear/Equipment List">@location.Name</td>
                         <td>@(location.StartDate?.ToShortDateString() ?? "")</td>
                         <td>
                             @if (!string.IsNullOrEmpty(location.Berth))
                             {
-                                <span class="text-primary" style="cursor: pointer; text-decoration: none;" 
-                                      @onclick="@(() => NavigateToBerth(location.Berth))">
+                                <a href="/berths/@Uri.EscapeDataString(location.Berth)" target="_blank" class="text-primary" style="text-decoration: none;" title="Click the Berth to open Berth Management">
                                     @location.Berth
-                                </span>
+                                </a>
                             }
                             else
                             {
@@ -127,7 +126,7 @@ else
         </table>
     </div>
     <div class="instruction-text">
-        Click location (blue box) to see Gear / Equipment List
+        Click a location to see Gear / Equipment List
     </div>
 }
 
@@ -146,7 +145,14 @@ else
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label">Name</label>
-                                <InputText @bind-Value="editingLocation.Name" class="form-control" />
+                                @if (selectedLocation == null)
+                                {
+                                    <InputText @bind-Value="editingLocation.Name" class="form-control" />
+                                }
+                                else
+                                {
+                                    <InputText @bind-Value="editingLocation.Name" class="form-control" readonly />
+                                }
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Type</label>
@@ -231,7 +237,6 @@ else
 
 <style>
     .location-cell {
-        border: 2px solid #0d6efd;
         cursor: pointer;
     }
     .instruction-text {
@@ -266,17 +271,17 @@ else
         try
         {
             // Load locations with initial sorting
-            _locations = await LockerDbContext.Locations
-                .Include(l => l.Type)
-                .Include(l => l.BerthNavigation)
-                .OrderBy(l => l.Name)
+        _locations = await LockerDbContext.Locations
+            .Include(l => l.Type)
+            .Include(l => l.BerthNavigation)
+            .OrderBy(l => l.Name)
                 .ThenByDescending(l => l.StartDate)
-                .ToListAsync();
+            .ToListAsync();
 
-            _locationTypes = await LockerDbContext.LocationTypes.ToListAsync();
-            _berths = await LockerDbContext.Berths.Where(b => !b.IsArchived).OrderBy(b => b.Name).ToListAsync();
+        _locationTypes = await LockerDbContext.LocationTypes.ToListAsync();
+        _berths = await LockerDbContext.Berths.Where(b => !b.IsArchived).OrderBy(b => b.Name).ToListAsync();
 
-            FilterLocations();
+        FilterLocations();
         }
         catch (Exception ex)
         {
@@ -477,44 +482,44 @@ else
 
     private void ViewInventory(Location location)
     {
-        // Navigate to the inventory view for this location
-        NavigationManager.NavigateTo($"/inventory/{location.Id}");
+        // Navigate to the inventory onsite details view filtered for this location
+        NavigationManager.NavigateTo($"/inventory-onsite?locationId={location.Id}&locationName={Uri.EscapeDataString(location.Name ?? "")}");
     }
 
     private async Task HandleLocationSubmit()
     {
         try
         {
-            if (selectedLocation == null)
+        if (selectedLocation == null)
+        {
+            editingLocation.AddDate = DateTime.Now;
+            editingLocation.AddUser = "SYSTEM"; // TODO: Get current user
+            LockerDbContext.Locations.Add(editingLocation);
+        }
+        else
+        {
+            var location = await LockerDbContext.Locations.FindAsync(selectedLocation.Id);
+            if (location != null)
             {
-                editingLocation.AddDate = DateTime.Now;
-                editingLocation.AddUser = "SYSTEM"; // TODO: Get current user
-                LockerDbContext.Locations.Add(editingLocation);
-            }
-            else
-            {
-                var location = await LockerDbContext.Locations.FindAsync(selectedLocation.Id);
-                if (location != null)
-                {
-                    location.Name = editingLocation.Name;
-                    location.LocationType = editingLocation.LocationType;
+                location.Name = editingLocation.Name;
+                location.LocationType = editingLocation.LocationType;
                     location.StartDate = editingLocation.StartDate;
-                    location.Berth = editingLocation.Berth;
+                location.Berth = editingLocation.Berth;
                     location.Gear = editingLocation.Gear;
                     location.Cargo = editingLocation.Cargo;
                     location.Superintendent = editingLocation.Superintendent;
                     location.Foreman = editingLocation.Foreman;
                     location.Standby = editingLocation.Standby;
                     location.Phone = editingLocation.Phone;
-                    location.Note = editingLocation.Note;
-                    location.ModDate = DateTime.Now;
-                    location.ModUser = "SYSTEM"; // TODO: Get current user
-                }
+                location.Note = editingLocation.Note;
+                location.ModDate = DateTime.Now;
+                location.ModUser = "SYSTEM"; // TODO: Get current user
             }
+        }
 
-            await LockerDbContext.SaveChangesAsync();
-            await LoadData();
-            CloseLocationModal();
+        await LockerDbContext.SaveChangesAsync();
+        await LoadData();
+        CloseLocationModal();
         }
         catch (Exception ex)
         {
@@ -531,9 +536,6 @@ else
 
     private void NavigateToBerth(string berthId)
     {
-        if (!string.IsNullOrEmpty(berthId))
-        {
-            NavigationManager.NavigateTo($"/berths/{berthId}");
-        }
+        // Method no longer needed as we're using direct anchor tags
     }
 }

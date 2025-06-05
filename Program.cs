@@ -10,6 +10,8 @@ using AccessMigrationApp.Data.BCMEA;
 using AccessMigrationApp.Data.CorporateMaster;
 using AccessMigrationApp.Data.LabourDB;
 using AccessMigrationApp.Data.LockerDB;
+using AccessMigrationApp.Services;
+using QuestPDF.Infrastructure;
 
 namespace AccessMigrationApp;
 
@@ -29,12 +31,9 @@ public class Program
             
         builder.Services.AddDbContext<CorporateMasterContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("CorporateMasterConnection") ?? defaultConnection));
-              builder.Services.AddDbContext<LockerDbContext>(options =>
-            options.UseSqlServer(defaultConnection, sqlOptions =>
-                sqlOptions.EnableRetryOnFailure(
-                    maxRetryCount: 5,
-                    maxRetryDelay: TimeSpan.FromSeconds(30),
-                    errorNumbersToAdd: null)));
+            
+        builder.Services.AddDbContext<LockerDbContext>(options =>
+            options.UseSqlServer(defaultConnection));
             
         builder.Services.AddDbContext<LabourDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("LabourDBConnection") ?? defaultConnection));
@@ -46,6 +45,12 @@ public class Program
         builder.Services.AddServerSideBlazor();
         builder.Services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
         builder.Services.AddSingleton<WeatherForecastService>();
+
+        // Register report service
+        builder.Services.AddScoped<IReportService, ReportService>();
+
+        // Register QuestPDF license
+        QuestPDF.Settings.License = LicenseType.Community;
 
         var app = builder.Build();
 
@@ -61,12 +66,10 @@ public class Program
             app.UseHsts();
         }
 
+        // Ensure HTTPS redirection is configured before other middleware
         app.UseHttpsRedirection();
-
         app.UseStaticFiles();
-
         app.UseRouting();
-
         app.UseAuthorization();
 
         app.MapControllers();
