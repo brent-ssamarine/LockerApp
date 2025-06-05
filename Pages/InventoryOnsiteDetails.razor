@@ -49,7 +49,7 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var item in pagedInventoryItems)
+                @foreach (var item in inventoryItems)
                 {
                     <tr>
                         <td class="item-name">
@@ -84,8 +84,7 @@ else
                         </td>
                         <td>
                             <button class="btn btn-secondary me-2" @onclick="() => ShowDetails(item)">Details</button>
-                            <button class="btn btn-primary @(item.IsModified ? "" : "d-none")" 
-                                    @onclick="() => SaveChanges(item)">
+                            <button class="btn btn-primary @(item.IsModified ? "" : "d-none")" @onclick="() => SaveChanges(item)">
                                 Save
                             </button>
                         </td>
@@ -119,7 +118,7 @@ else
             </div>
             <div class="col-auto">
                 <label>Transfer Remaining inventory</label>
-                <select class="form-select transfer-location-select" @bind="selectedTransferLocation">
+                <select class="form-select location-select" @bind="selectedTransferLocation">
                     <option value="">Select...</option>
                     @if (transferLocations != null)
                     {
@@ -132,7 +131,7 @@ else
             </div>
             <div class="col-auto">
                 <label>Taken From</label>
-                <select class="form-select" @bind="selectedTakenFromType">
+                <select class="form-select location-select" @bind="selectedTakenFromType">
                     <option value="">Select...</option>
                     @if (locationTypes != null)
                     {
@@ -143,55 +142,46 @@ else
                     }
                 </select>
             </div>
-            <div class="col-auto">
-                <label>as of</label>
-                <select class="form-select location-select" @bind="selectedAsOfDateString">
-                    <option value="">Select...</option>
-                    @if (asOfDateOptions != null && asOfDateOptions.Any())
-                    {
-                        foreach (var dateStr in asOfDateOptions.Take(7))
+            <div class="col-auto d-flex align-items-end">
+                <div>
+                    <label>as of</label>
+                    <select class="form-select location-select" @bind="selectedAsOfDateString">
+                        <option value="">Select...</option>
+                        @if (asOfDateOptions != null && asOfDateOptions.Any())
                         {
-                            <option value="@dateStr">@dateStr</option>
+                            @foreach (var dateStr in asOfDateOptions)
+                            {
+                                <option value="@dateStr">@dateStr</option>
+                            }
                         }
-                    }
-                    else if (asOfDateOptions != null)
-                    {
-                        <option value="" disabled>No dates available</option>
-                    }
-                    else
-                    {
-                        <option value="" disabled>Loading dates...</option>
-                    }
-                </select>
-            </div>
-            <div class="col">
-                <label>Inspected By</label>
-                <textarea class="form-control" @bind="inspectedBy" rows="2"></textarea>
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-primary align-self-end" style="margin-top: 1.95rem;">Move</button>
+                        else if (asOfDateOptions != null)
+                        {
+                            <option value="" disabled>No dates available</option>
+                        }
+                        else
+                        {
+                            <option value="" disabled>Loading dates...</option>
+                        }
+                    </select>
+                </div>
+                <div style="width: 2rem;"></div>
+                <div>
+                    <label>Inspected By</label>
+                    <textarea class="form-control" @bind="inspectedBy" rows="3" style="width: 300px;"></textarea>
+                </div>
+                <div class="ms-3 d-flex align-items-end">
+                    <button class="btn btn-primary">Move</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Tiny space between dropdown controls and pagination -->
+    <!-- Tiny space between dropdown controls and move button -->
     <div style="height: 0.5rem;"></div>
 
-    <!-- Page navigation -->
-    <div class="d-flex justify-content-center mb-4">
-        <nav aria-label="Inventory Onsite Pagination">
-            <ul class="pagination">
-                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                    <button class="page-link" @onclick="PreviousPage">Previous</button>
-                </li>
-                <li class="page-item disabled">
-                    <span class="page-link">Page @currentPage of @totalPages</span>
-                </li>
-                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                    <button class="page-link" @onclick="NextPage">Next</button>
-                </li>
-            </ul>
-        </nav>
+    <!-- Move button row at the bottom, aligned with Details -->
+    <div class="d-flex justify-content-end align-items-center mb-2" style="min-height: 38px;">
+        <button class="btn btn-primary" style="vertical-align: middle;" @onclick="() => ShowMoveDialog(null)">Move</button>
     </div>
 }
 
@@ -304,7 +294,9 @@ else
         padding-bottom: 0.25rem;
     }
     
-    .form-select, .form-control {
+    .form-select, .form-control, .location-select {
+        font-family: Consolas, monospace;
+        white-space: pre;
         height: calc(1.5em + 0.5rem + 2px);
         line-height: 1.5;
     }
@@ -340,13 +332,6 @@ else
     private string? selectedAsOfDateString;
 
     private bool CanPrint => !string.IsNullOrEmpty(selectedPrintLocation);
-
-    private int currentPage = 1;
-    private int pageSize = 10;
-    private int totalPages = 1;
-
-    private List<InventoryLocationViewModel>? pagedInventoryItems =>
-        inventoryItems?.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -457,7 +442,6 @@ else
 
             var items = await query.OrderBy(i => i.ItemName).ToListAsync();
             inventoryItems = items;
-            await UpdatePaginationAsync();
         }
         catch (Exception ex)
         {
@@ -698,37 +682,5 @@ else
         {
             await LoadData();
         }
-    }
-
-    private void PreviousPage()
-    {
-        if (currentPage > 1)
-        {
-            currentPage--;
-        }
-    }
-
-    private void NextPage()
-    {
-        if (currentPage < totalPages)
-        {
-            currentPage++;
-        }
-    }
-
-    private async Task UpdatePaginationAsync()
-    {
-        if (inventoryItems != null)
-        {
-            totalPages = (int)Math.Ceiling((double)inventoryItems.Count / pageSize);
-            if (currentPage > totalPages) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
-        }
-        else
-        {
-            totalPages = 1;
-            currentPage = 1;
-        }
-        await InvokeAsync(StateHasChanged);
     }
 }
