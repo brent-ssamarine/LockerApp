@@ -401,10 +401,13 @@ public class TwoWeek
     public DateTime SelectDate { get; set; }
 }
 
-[Keyless]
 [Table("inventory_onsite")]
 public class InventoryOnsite
 {
+    [Key]
+    [Column("invloc_id")]
+    public int Id { get; set; }
+    
     [Column("item")]
     public string? Item { get; set; }
     
@@ -420,7 +423,7 @@ public class InventoryOnsite
     [Column("class")]
     public string? Class { get; set; }
     
-    [Column("invloc_id")]
+    [Column("location")]
     public int? LocationId { get; set; }
     
     [Column("loc_name")]

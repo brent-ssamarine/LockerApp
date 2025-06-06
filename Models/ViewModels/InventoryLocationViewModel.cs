@@ -4,6 +4,8 @@ namespace AccessMigrationApp.Models.ViewModels
 {
     public class InventoryLocationViewModel
     {
+        public int Id { get; set; }
+        public int InvlocId { get; set; }  // Added for database invloc_id field
         public string ItemId { get; set; } = null!;
         public string ItemName { get; set; } = null!;
         public string NewItemName { get; set; } = null!;
@@ -30,4 +32,4 @@ namespace AccessMigrationApp.Models.ViewModels
         public DateTime? Thorough { get; set; }
         public bool IsActive { get; set; }
     }
-} 
+}

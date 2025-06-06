@@ -4,6 +4,8 @@ namespace AccessMigrationApp.Models.ViewModels;
 
 public class InventoryOnsiteViewModel
 {
+    public int Id { get; set; }
+    public int InvlocId { get; set; }  // Added for database invloc_id field
     public string? Item { get; set; }
     public string? ItemName { get; set; }
     public string? Description { get; set; }
