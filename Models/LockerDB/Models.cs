@@ -443,3 +443,59 @@ public class InventoryOnsite
     [Column("finished")]
     public short? Finished { get; set; }
 }
+
+[Keyless]
+[Table("invtran")]
+public class InvTran
+{
+    [Column("id")]
+    public int Id { get; set; }
+    
+    [Column("item")]
+    public string? ItemId { get; set; }
+    
+    [Column("item_name")]
+    public string? ItemName { get; set; }
+    
+    [Column("item_desc")]
+    public string? ItemDescription { get; set; }
+    
+    [Column("from_location")]
+    public int? FromLocation { get; set; }
+    
+    [Column("to_location")]
+    public int? ToLocation { get; set; }
+    
+    [Column("company")]
+    public string? Company { get; set; }
+    
+    [Column("job")]
+    public string? Job { get; set; }
+    
+    [Column("issue_val")]
+    public short? IssueValue { get; set; }
+    
+    [Column("taken_from")]
+    public string? TakenFrom { get; set; }
+    
+    [Column("transfer_date")]
+    public DateTime? TransferDate { get; set; }
+    
+    [Column("quantity")]
+    public double? Quantity { get; set; }
+    
+    [Column("costper")]
+    public double? CostPer { get; set; }
+    
+    [Column("ponum")]
+    public string? PONumber { get; set; }
+    
+    [Column("locker")]
+    public double? Locker { get; set; }
+    
+    [Column("onhand")]
+    public double? OnHand { get; set; }
+    
+    [Column("inspected_by")]
+    public string? InspectedBy { get; set; }
+}

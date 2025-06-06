@@ -21,8 +21,8 @@ public class LockerDbContext : DbContext
     public DbSet<Line> Lines { get; set; }
     public DbSet<LocationType> LocationTypes { get; set; }
     public DbSet<Location> Locations { get; set; }
-    public DbSet<LockerInventory> LockerInventories { get; set; }
-    public DbSet<InventoryOnsite> InventoryOnsites { get; set; }
+    public DbSet<LockerInventory> LockerInventories { get; set; }    public DbSet<InventoryOnsite> InventoryOnsites { get; set; }
+    public DbSet<InvTran> InvTrans { get; set; }
     public DbSet<TestClass> TestClasses { get; set; }
     public DbSet<TwoWeek> TwoWeeks { get; set; }
 

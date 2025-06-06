@@ -219,6 +219,12 @@ else
                Description="@(selectedItem?.Description ?? string.Empty)"
                OnMoveCompleted="OnMoveCompleted" />
 
+<InventoryTransferDetails Show="@showDetailsDialog"
+                         ShowChanged="@((bool value) => showDetailsDialog = value)"
+                         InvlocId="@(selectedItem?.InvlocId ?? 0)"
+                         ItemId="@(selectedItem?.ItemId ?? string.Empty)"
+                         ItemName="@(selectedItem?.ItemName ?? string.Empty)" />
+
 <style>
     .instructions {
         color: #4CAF50;
@@ -384,6 +390,7 @@ else
     private string inspectedBy = "";
     private DateTime asOfDate = DateTime.Today;
     private bool showMoveDialog;
+    private bool showDetailsDialog;
     private InventoryLocationViewModel? selectedItem;
     private List<string>? asOfDateOptions;
     private string? selectedAsOfDateString;
@@ -554,7 +561,8 @@ else
 
     private void ShowDetails(InventoryLocationViewModel item)
     {
-        // TODO: Implement details modal
+        selectedItem = item;
+        showDetailsDialog = true;
     }
 
     private void MoveInventory(InventoryLocationViewModel item)
