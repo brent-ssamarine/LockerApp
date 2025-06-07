@@ -2,11 +2,10 @@
 @using AccessMigrationApp.Models.LockerDB
 @using Microsoft.EntityFrameworkCore
 @inject LockerDbContext LockerDbContext
-@inject IJSRuntime JSRuntime
 
 @if (Show)
 {
-    <div class="modal fade show" style="display: block" tabindex="-1" id="transferDetailsModal">
+    <div class="modal fade show" style="display: block" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
@@ -97,9 +96,7 @@
     [Parameter] public EventCallback<bool> ShowChanged { get; set; }
     [Parameter] public int InvlocId { get; set; }
     [Parameter] public string ItemId { get; set; } = "";
-    [Parameter] public string ItemName { get; set; } = "";
-
-    private List<InventoryTransferViewModel>? transferDetails;
+    [Parameter] public string ItemName { get; set; } = "";    private List<InventoryTransferViewModel>? transferDetails;
     private bool isLoading = false;
     private bool isFromLocationSearch = false;
     private bool hasLoadedData = false;
@@ -109,7 +106,6 @@
         // Load data immediately when modal becomes visible and we have all required parameters
         if (Show && !hasLoadedData && InvlocId > 0 && !string.IsNullOrEmpty(ItemId))
         {
-            Console.WriteLine($"OnAfterRenderAsync: Loading data for ItemId='{ItemId}', InvlocId={InvlocId}");
             hasLoadedData = true;
             await LoadTransferDetails();
         }
@@ -123,10 +119,7 @@
         if (!Show)
         {
             hasLoadedData = false;
-            transferDetails = null;
-        }
-        
-        Console.WriteLine($"OnParametersSet: Show={Show}, ItemId='{ItemId}', InvlocId={InvlocId}, hasLoadedData={hasLoadedData}");
+            transferDetails = null;        }
     }
 
     private async Task LoadTransferDetails()
@@ -140,8 +133,6 @@
         {
             string trimmedItemId = ItemId?.Trim() ?? "";
             isFromLocationSearch = false;
-            
-            Console.WriteLine($"Loading transfers: InvlocId={InvlocId}, ItemId='{trimmedItemId}'");
             
             // Primary query - ToLocation match
             transferDetails = await LockerDbContext.InvTrans
@@ -164,17 +155,13 @@
                     TransferDate = t.TransferDate,
                     Quantity = t.Quantity,
                     CostPer = t.CostPer,
-                    PONumber = t.PONumber,
-                    InspectedBy = t.InspectedBy
+                    PONumber = t.PONumber,                    InspectedBy = t.InspectedBy
                 })
                 .ToListAsync();
-                
-            Console.WriteLine($"ToLocation query found {transferDetails.Count} records");
             
             // Fallback query - FromLocation match
             if (transferDetails.Count == 0)
             {
-                Console.WriteLine("Trying FromLocation search...");
                 isFromLocationSearch = true;
                 
                 transferDetails = await LockerDbContext.InvTrans
@@ -196,16 +183,11 @@
                         TakenFrom = t.TakenFrom,
                         TransferDate = t.TransferDate,
                         Quantity = t.Quantity,
-                        CostPer = t.CostPer,
-                        PONumber = t.PONumber,
+                        CostPer = t.CostPer,                        PONumber = t.PONumber,
                         InspectedBy = t.InspectedBy
                     })
                     .ToListAsync();
-                    
-                Console.WriteLine($"FromLocation query found {transferDetails.Count} records");
             }
-            
-            Console.WriteLine($"Total records found: {transferDetails.Count}");
         }
         catch (Exception ex)
         {
@@ -221,7 +203,6 @@
 
     private async Task ManualReload()
     {
-        Console.WriteLine("Manual reload triggered");
         await LoadTransferDetails();
     }
 
