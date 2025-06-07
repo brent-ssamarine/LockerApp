@@ -490,12 +490,8 @@ public class InvTran
     [Column("ponum")]
     public string? PONumber { get; set; }
     
-    [Column("locker")]
-    public double? Locker { get; set; }
-    
-    [Column("onhand")]
-    public double? OnHand { get; set; }
-    
     [Column("inspected_by")]
     public string? InspectedBy { get; set; }
+    
+    // Removed locker and onhand columns as they don't exist in the view
 }
