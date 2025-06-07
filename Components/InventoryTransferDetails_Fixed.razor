@@ -1,0 +1,234 @@
+@using AccessMigrationApp.Models.ViewModels
+@using AccessMigrationApp.Models.LockerDB
+@using Microsoft.EntityFrameworkCore
+@inject LockerDbContext LockerDbContext
+@inject IJSRuntime JSRuntime
+
+@if (Show)
+{
+    <div class="modal fade show" style="display: block" tabindex="-1" id="transferDetailsModal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Inventory Transfer Details</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="OnClose"></button>
+                </div>
+                <div class="modal-body">
+                    @if (isLoading)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Loading transfer details...</p>
+                        </div>
+                    }
+                    else if (transferDetails == null || !transferDetails.Any())
+                    {
+                        <div class="alert alert-info">
+                            <strong>No transfer records found</strong> for this item and location.
+                            <div class="mt-2">
+                                <small class="text-muted">Item ID: @ItemId</small><br/>
+                                <small class="text-muted">Location ID: @InvlocId</small>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <h6>Item: @ItemName (@ItemId)</h6>
+                            <small class="text-muted">Showing transfers where @(isFromLocationSearch ? "From" : "To") Location = @InvlocId</small>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Transfer Date</th>
+                                        <th>From Location</th>
+                                        <th>To Location</th>
+                                        <th>Company</th>
+                                        <th>Job</th>
+                                        <th>Quantity</th>
+                                        <th>Cost Per</th>
+                                        <th>Taken From</th>
+                                        <th>Inspected By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var transfer in transferDetails)
+                                    {
+                                        <tr>
+                                            <td>@(transfer.TransferDate?.ToString("MM/dd/yyyy") ?? "N/A")</td>
+                                            <td>@transfer.FromLocation</td>
+                                            <td>@transfer.ToLocation</td>
+                                            <td>@transfer.Company</td>
+                                            <td>@transfer.Job</td>
+                                            <td class="text-end">@transfer.Quantity?.ToString("F2")</td>
+                                            <td class="text-end">@(transfer.CostPer?.ToString("C") ?? "N/A")</td>
+                                            <td>@transfer.TakenFrom</td>
+                                            <td>@transfer.InspectedBy</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        @if (transferDetails.Count > 10)
+                        {
+                            <div class="mt-2">
+                                <small class="text-muted">Showing @transferDetails.Count transfer record(s)</small>
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary me-2" @onclick="ManualReload">Reload Data</button>
+                    <button type="button" class="btn btn-secondary" @onclick="OnClose">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback<bool> ShowChanged { get; set; }
+    [Parameter] public int InvlocId { get; set; }
+    [Parameter] public string ItemId { get; set; } = "";
+    [Parameter] public string ItemName { get; set; } = "";
+
+    private List<InventoryTransferViewModel>? transferDetails;
+    private bool isLoading = false;
+    private bool isFromLocationSearch = false;
+    private bool hasLoadedData = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Load data immediately when modal becomes visible and we have all required parameters
+        if (Show && !hasLoadedData && InvlocId > 0 && !string.IsNullOrEmpty(ItemId))
+        {
+            Console.WriteLine($"OnAfterRenderAsync: Loading data for ItemId='{ItemId}', InvlocId={InvlocId}");
+            hasLoadedData = true;
+            await LoadTransferDetails();
+        }
+        
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Reset data loading flag when modal is closed
+        if (!Show)
+        {
+            hasLoadedData = false;
+            transferDetails = null;
+        }
+        
+        Console.WriteLine($"OnParametersSet: Show={Show}, ItemId='{ItemId}', InvlocId={InvlocId}, hasLoadedData={hasLoadedData}");
+    }
+
+    private async Task LoadTransferDetails()
+    {
+        if (isLoading) return; // Prevent multiple concurrent loads
+        
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            string trimmedItemId = ItemId?.Trim() ?? "";
+            isFromLocationSearch = false;
+            
+            Console.WriteLine($"Loading transfers: InvlocId={InvlocId}, ItemId='{trimmedItemId}'");
+            
+            // Primary query - ToLocation match
+            transferDetails = await LockerDbContext.InvTrans
+                .Where(t => t.ToLocation == InvlocId && 
+                           t.ItemId != null && 
+                           t.ItemId.Trim().ToLower() == trimmedItemId.ToLower())
+                .OrderByDescending(t => t.TransferDate)
+                .Select(t => new InventoryTransferViewModel
+                {
+                    Id = t.Id,
+                    ItemId = t.ItemId,
+                    ItemName = t.ItemName,
+                    ItemDescription = t.ItemDescription,
+                    FromLocation = t.FromLocation,
+                    ToLocation = t.ToLocation,
+                    Company = t.Company,
+                    Job = t.Job,
+                    IssueValue = t.IssueValue,
+                    TakenFrom = t.TakenFrom,
+                    TransferDate = t.TransferDate,
+                    Quantity = t.Quantity,
+                    CostPer = t.CostPer,
+                    PONumber = t.PONumber,
+                    InspectedBy = t.InspectedBy
+                })
+                .ToListAsync();
+                
+            Console.WriteLine($"ToLocation query found {transferDetails.Count} records");
+            
+            // Fallback query - FromLocation match
+            if (transferDetails.Count == 0)
+            {
+                Console.WriteLine("Trying FromLocation search...");
+                isFromLocationSearch = true;
+                
+                transferDetails = await LockerDbContext.InvTrans
+                    .Where(t => t.FromLocation == InvlocId && 
+                               t.ItemId != null && 
+                               t.ItemId.Trim().ToLower() == trimmedItemId.ToLower())
+                    .OrderByDescending(t => t.TransferDate)
+                    .Select(t => new InventoryTransferViewModel
+                    {
+                        Id = t.Id,
+                        ItemId = t.ItemId,
+                        ItemName = t.ItemName,
+                        ItemDescription = t.ItemDescription,
+                        FromLocation = t.FromLocation,
+                        ToLocation = t.ToLocation,
+                        Company = t.Company,
+                        Job = t.Job,
+                        IssueValue = t.IssueValue,
+                        TakenFrom = t.TakenFrom,
+                        TransferDate = t.TransferDate,
+                        Quantity = t.Quantity,
+                        CostPer = t.CostPer,
+                        PONumber = t.PONumber,
+                        InspectedBy = t.InspectedBy
+                    })
+                    .ToListAsync();
+                    
+                Console.WriteLine($"FromLocation query found {transferDetails.Count} records");
+            }
+            
+            Console.WriteLine($"Total records found: {transferDetails.Count}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading transfer details: {ex.Message}");
+            transferDetails = new List<InventoryTransferViewModel>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ManualReload()
+    {
+        Console.WriteLine("Manual reload triggered");
+        await LoadTransferDetails();
+    }
+
+    private async Task OnClose()
+    {
+        hasLoadedData = false;
+        transferDetails = null;
+        await ShowChanged.InvokeAsync(false);
+    }
+}
