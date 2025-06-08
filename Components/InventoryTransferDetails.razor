@@ -1,7 +1,9 @@
 @using AccessMigrationApp.Models.ViewModels
 @using AccessMigrationApp.Models.LockerDB
 @using Microsoft.EntityFrameworkCore
+@using System.Threading
 @inject LockerDbContext LockerDbContext
+@implements IDisposable
 
 @if (Show)
 {
@@ -100,37 +102,37 @@
     private bool isLoading = false;
     private bool isFromLocationSearch = false;
     private bool hasLoadedData = false;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        // Load data immediately when modal becomes visible and we have all required parameters
-        if (Show && !hasLoadedData && InvlocId > 0 && !string.IsNullOrEmpty(ItemId))
-        {
-            hasLoadedData = true;
-            await LoadTransferDetails();
-        }
-        
-        await base.OnAfterRenderAsync(firstRender);
-    }
-
-    protected override void OnParametersSet()
+    private readonly SemaphoreSlim _loadingSemaphore = new(1, 1);    protected override async Task OnParametersSetAsync()
     {
         // Reset data loading flag when modal is closed
         if (!Show)
         {
             hasLoadedData = false;
-            transferDetails = null;        }
-    }
-
-    private async Task LoadTransferDetails()
-    {
-        if (isLoading) return; // Prevent multiple concurrent loads
+            transferDetails = null;
+        }
+        // Load data when modal opens and all required parameters are available
+        else if (Show && !hasLoadedData && InvlocId > 0 && !string.IsNullOrEmpty(ItemId))
+        {
+            hasLoadedData = true;
+            await LoadTransferDetails();
+        }
         
-        isLoading = true;
-        StateHasChanged();
+        await base.OnParametersSetAsync();
+    }    private async Task LoadTransferDetails()
+    {
+        // Use semaphore to prevent concurrent database operations
+        if (!await _loadingSemaphore.WaitAsync(0)) // Don't wait, just check if available
+        {
+            return;
+        }
         
         try
         {
+            if (isLoading) return; // Additional check
+            
+            isLoading = true;
+            StateHasChanged();
+            
             string trimmedItemId = ItemId?.Trim() ?? "";
             isFromLocationSearch = false;
             
@@ -155,8 +157,8 @@
                     TransferDate = t.TransferDate,
                     Quantity = t.Quantity,
                     CostPer = t.CostPer,
-                    PONumber = t.PONumber,                    InspectedBy = t.InspectedBy
-                })
+                    PONumber = t.PONumber,
+                    InspectedBy = t.InspectedBy                })
                 .ToListAsync();
             
             // Fallback query - FromLocation match
@@ -183,25 +185,23 @@
                         TakenFrom = t.TakenFrom,
                         TransferDate = t.TransferDate,
                         Quantity = t.Quantity,
-                        CostPer = t.CostPer,                        PONumber = t.PONumber,
-                        InspectedBy = t.InspectedBy
-                    })
+                        CostPer = t.CostPer,
+                        PONumber = t.PONumber,
+                        InspectedBy = t.InspectedBy                    })
                     .ToListAsync();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading transfer details: {ex.Message}");
             transferDetails = new List<InventoryTransferViewModel>();
         }
         finally
         {
             isLoading = false;
             StateHasChanged();
+            _loadingSemaphore.Release();
         }
-    }
-
-    private async Task ManualReload()
+    }    private async Task ManualReload()
     {
         await LoadTransferDetails();
     }
@@ -211,5 +211,10 @@
         hasLoadedData = false;
         transferDetails = null;
         await ShowChanged.InvokeAsync(false);
+    }
+
+    public void Dispose()
+    {
+        _loadingSemaphore?.Dispose();
     }
 }
