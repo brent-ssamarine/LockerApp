@@ -36,35 +36,35 @@
                         </div>
                     }
                     else
-                    {
-                        <div class="mb-3">
-                            <h6>Item: @ItemName (@ItemId)</h6>
+                    {                        <div class="mb-3">
+                            <div class="item-info">
+                                <div class="item-name">@ItemName</div>
+                                <div class="item-id">ID: @ItemId</div>
+                            </div>
                             <small class="text-muted">Showing transfers where @(isFromLocationSearch ? "From" : "To") Location = @InvlocId</small>
                         </div>
                         
                         <div class="table-responsive">
-                            <table class="table table-striped table-sm">
-                                <thead class="table-dark">
+                            <table class="table table-striped table-sm">                                <thead class="table-dark">
                                     <tr>
-                                        <th></th>
-                                        <th>From</th>
-                                        <th></th>
-                                        <th>To</th>
+                                        <th>From ID</th>
+                                        <th class="location-name-column">From Location</th>
+                                        <th>To ID</th>
+                                        <th class="location-name-column">To Location</th>
                                         <th>Date</th>
                                         <th>Qty</th>
                                         <th>Cost</th>
                                         <th>PO Num</th>
                                         <th class="inspected-by-column">Inspected By</th>
                                     </tr>
-                                </thead>
-                                <tbody>
+                                </thead>                                <tbody>
                                     @foreach (var transfer in transferDetails)
                                     {
                                         <tr>
-                                            <td>@transfer.FromLocation</td>
-                                            <td>@transfer.FromName</td>
-                                            <td>@transfer.ToLocation</td>
-                                            <td>@transfer.ToName</td>
+                                            <td >@transfer.FromLocation</td>
+                                            <td class="location-name-column">@transfer.FromName</td>
+                                            <td >@transfer.ToLocation</td>
+                                            <td class="location-name-column">@transfer.ToName</td>
                                             <td>@(transfer.TransferDate?.ToString("MM/dd/yyyy") ?? "N/A")</td>
                                             <td class="text-end">@transfer.Quantity?.ToString("F2")</td>
                                             <td class="text-end">@(transfer.CostPer?.ToString("C") ?? "N/A")</td>
@@ -98,6 +98,27 @@
         min-width: 200px;
         width: 200px;
     }
+    
+    .location-name-column {
+        min-width: 180px;
+        width: 180px;
+    }
+    
+    .item-info {
+        margin-bottom: 0.5rem;
+    }
+    
+    .item-name {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .item-id {
+        font-size: 0.9rem;
+        color: #666;
+        font-style: italic;
+    }
 </style>
 
 @code {
@@ -105,11 +126,13 @@
     [Parameter] public EventCallback<bool> ShowChanged { get; set; }
     [Parameter] public int InvlocId { get; set; }
     [Parameter] public string ItemId { get; set; } = "";
-    [Parameter] public string ItemName { get; set; } = "";    private List<InventoryTransferViewModel>? transferDetails;
+    [Parameter] public string ItemName { get; set; } = "";
+    private List<InventoryTransferViewModel>? transferDetails;
     private bool isLoading = false;
     private bool isFromLocationSearch = false;
     private bool hasLoadedData = false;
-    private readonly SemaphoreSlim _loadingSemaphore = new(1, 1);    protected override async Task OnParametersSetAsync()
+    private readonly SemaphoreSlim _loadingSemaphore = new(1, 1);
+    protected override async Task OnParametersSetAsync()
     {
         // Reset data loading flag when modal is closed
         if (!Show)
