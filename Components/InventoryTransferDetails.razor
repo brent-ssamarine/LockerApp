@@ -2,7 +2,8 @@
 @using AccessMigrationApp.Models.LockerDB
 @using Microsoft.EntityFrameworkCore
 @using System.Threading
-@inject LockerDbContext LockerDbContext
+@using AccessMigrationApp.Data.LockerDB
+@inject IServiceProvider ServiceProvider
 @implements IDisposable
 
 @if (Show)
@@ -136,8 +137,12 @@
             string trimmedItemId = ItemId?.Trim() ?? "";
             isFromLocationSearch = false;
             
+            // Create a new scoped DbContext for this operation to avoid concurrency issues
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+            
             // Primary query - ToLocation match
-            transferDetails = await LockerDbContext.InvTrans
+            transferDetails = await dbContext.InvTrans
                 .Where(t => t.ToLocation == InvlocId && 
                            t.ItemId != null && 
                            t.ItemId.Trim().ToLower() == trimmedItemId.ToLower())
@@ -158,7 +163,8 @@
                     Quantity = t.Quantity,
                     CostPer = t.CostPer,
                     PONumber = t.PONumber,
-                    InspectedBy = t.InspectedBy                })
+                    InspectedBy = t.InspectedBy
+                })
                 .ToListAsync();
             
             // Fallback query - FromLocation match
@@ -166,7 +172,7 @@
             {
                 isFromLocationSearch = true;
                 
-                transferDetails = await LockerDbContext.InvTrans
+                transferDetails = await dbContext.InvTrans
                     .Where(t => t.FromLocation == InvlocId && 
                                t.ItemId != null && 
                                t.ItemId.Trim().ToLower() == trimmedItemId.ToLower())
@@ -187,7 +193,8 @@
                         Quantity = t.Quantity,
                         CostPer = t.CostPer,
                         PONumber = t.PONumber,
-                        InspectedBy = t.InspectedBy                    })
+                        InspectedBy = t.InspectedBy
+                    })
                     .ToListAsync();
             }
         }
@@ -201,7 +208,7 @@
             StateHasChanged();
             _loadingSemaphore.Release();
         }
-    }    private async Task ManualReload()
+    }private async Task ManualReload()
     {
         await LoadTransferDetails();
     }
