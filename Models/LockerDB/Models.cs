@@ -459,13 +459,19 @@ public class InvTran
     
     [Column("item_desc")]
     public string? ItemDescription { get; set; }
-    
+
     [Column("from_location")]
     public int? FromLocation { get; set; }
+
+    [Column("from_name")]
+    public string? FromName { get; set; }
     
     [Column("to_location")]
     public int? ToLocation { get; set; }
     
+    [Column("to_name")]
+    public string? ToName { get; set; }
+
     [Column("company")]
     public string? Company { get; set; }
     

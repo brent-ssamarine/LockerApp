@@ -5,7 +5,8 @@
 @using AccessMigrationApp.Components
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.JSInterop
-@inject LockerDbContext LockerDbContext
+@using AccessMigrationApp.Data.LockerDB
+@inject IServiceProvider ServiceProvider
 @inject NavigationManager NavigationManager
 @inject IReportService ReportService
 @inject IJSRuntime JSRuntime
@@ -421,7 +422,10 @@ else
         {
             if (LocationId == null) return;
 
-            allLocations = await LockerDbContext.Locations
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+            allLocations = await dbContext.Locations
                 .Where(l => 
                     l.Finished != 1 &&               // finished = False
                     l.LocationType != "SUPPLIER" &&  // loc_type <> "SUPPLIER"
@@ -447,11 +451,14 @@ else
         {
             if (LocationId == null) return;
 
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
             // Filter locations based on the specified conditions:
             // 1. loc_id <> current location
             // 2. finished = False
             // 3. loc_type <> 'SUPPLIER'
-            transferLocations = await LockerDbContext.Locations
+            transferLocations = await dbContext.Locations
                 .Where(l => 
                     l.Id != LocationId.Value &&  // loc_id <> current location
                     l.Finished != 1 &&            // finished = False
@@ -471,7 +478,10 @@ else
     {
         try
         {
-            locationTypes = await LockerDbContext.LocationTypes.OrderBy(t => t.Id).ToListAsync();
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+            locationTypes = await dbContext.LocationTypes.OrderBy(t => t.Id).ToListAsync();
         }
         catch (Exception ex)
         {
@@ -494,7 +504,10 @@ else
     {
         try
         {
-            var query = LockerDbContext.InventoryLocations
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+            var query = dbContext.InventoryLocations
                 .FromSqlRaw("SELECT * FROM dbo.inventory_onsite")
                 .Select(il => new InventoryLocationViewModel
                 {
@@ -534,7 +547,10 @@ else
     {
         try
         {
-            var dates = await LockerDbContext.TwoWeeks
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+            var dates = await dbContext.TwoWeeks
                 .Select(t => t.SelectDate)
                 .Distinct()
                 .OrderByDescending(d => d)
@@ -715,7 +731,10 @@ else
     {
         try
         {
-            var inventoryLocation = await LockerDbContext.InventoryLocations
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+            var inventoryLocation = await dbContext.InventoryLocations
                 .Include(il => il.Inventory)
                 .FirstOrDefaultAsync(il => il.ItemId == item.ItemId && il.LocationId == item.LocationId);
 
@@ -733,7 +752,7 @@ else
                     inventoryLocation.Inventory.Billable = (short)(item.NewIsBillable ? 1 : 0);
                 }
 
-                await LockerDbContext.SaveChangesAsync();
+                await dbContext.SaveChangesAsync();
                 
                 // Update the displayed values
                 item.ItemName = item.NewItemName;

@@ -9,7 +9,9 @@ public class InventoryTransferViewModel
     public string? ItemName { get; set; }
     public string? ItemDescription { get; set; }
     public int? FromLocation { get; set; }
+    public string? FromName { get; set; }
     public int? ToLocation { get; set; }
+    public string? ToName { get; set; }
     public string? Company { get; set; }
     public string? Job { get; set; }
     public short? IssueValue { get; set; }
