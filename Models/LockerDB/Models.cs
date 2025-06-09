@@ -444,10 +444,10 @@ public class InventoryOnsite
     public short? Finished { get; set; }
 }
 
-[Keyless]
 [Table("invtran")]
 public class InvTran
 {
+    [Key]
     [Column("id")]
     public int Id { get; set; }
     
@@ -485,9 +485,7 @@ public class InvTran
     public string? TakenFrom { get; set; }
     
     [Column("transfer_date")]
-    public DateTime? TransferDate { get; set; }
-    
-    [Column("quantity")]
+    public DateTime? TransferDate { get; set; }    [Column("quantity")]
     public double? Quantity { get; set; }
     
     [Column("costper")]
