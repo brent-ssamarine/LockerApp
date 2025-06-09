@@ -409,39 +409,31 @@ public class InventoryOnsite
     public int Id { get; set; }
     
     [Column("item")]
-    public string? Item { get; set; }
+    public string? ItemId { get; set; }
     
     [Column("item_name")]
     public string? ItemName { get; set; }
     
-    [Column("description")]
-    public string? Description { get; set; }
-    
-    [Column("inv_type")]
-    public string? InvType { get; set; }
-    
-    [Column("class")]
-    public string? Class { get; set; }
-    
     [Column("location")]
     public int? LocationId { get; set; }
     
-    [Column("loc_name")]
-    public string? LocationName { get; set; }
-    
-    [Column("on_hand")]
-    public double? OnHand { get; set; }
+    [Column("description")]
+    public string? Description { get; set; }
     
     [Column("issued")]
     public double? Issued { get; set; }
     
+    [Column("onhand")]
+    public double? OnHand { get; set; }
+    
     [Column("billable")]
     public short? Billable { get; set; }
-    
-    [Column("active")]
-    public short? Active { get; set; }
-    [Column("finished")]
-    public short? Finished { get; set; }
+
+    [ForeignKey(nameof(ItemId))]
+    public Inventory? Inventory { get; set; }
+
+    [ForeignKey(nameof(LocationId))]
+    public Location? Location { get; set; }
 }
 
 [Table("invtran")]

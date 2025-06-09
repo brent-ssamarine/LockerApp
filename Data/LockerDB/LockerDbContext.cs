@@ -21,11 +21,11 @@ public class LockerDbContext : DbContext
     public DbSet<Line> Lines { get; set; }
     public DbSet<LocationType> LocationTypes { get; set; }
     public DbSet<Location> Locations { get; set; }
-    public DbSet<LockerInventory> LockerInventories { get; set; }    public DbSet<InventoryOnsite> InventoryOnsites { get; set; }
+    public DbSet<LockerInventory> LockerInventories { get; set; }
+    public DbSet<InventoryOnsite> InventoryOnsites { get; set; }
     public DbSet<InvTran> InvTrans { get; set; }
     public DbSet<TestClass> TestClasses { get; set; }
     public DbSet<TwoWeek> TwoWeeks { get; set; }
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -34,5 +34,24 @@ public class LockerDbContext : DbContext
         // Configure any table-specific settings here
         modelBuilder.Entity<LockerInventory>()
             .ToTable("LOCKERINV");
+
+        // Configure InventoryLocation to handle database triggers
+        modelBuilder.Entity<InventoryLocation>()
+            .Property(e => e.Id)
+            .ValueGeneratedOnAdd();
+
+        // Configure InvTran to handle database triggers
+        modelBuilder.Entity<InvTran>()
+            .Property(e => e.Id)
+            .ValueGeneratedOnAdd();
+    }
+    
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        
+        // Configure to work better with database triggers
+        optionsBuilder.EnableSensitiveDataLogging(false)
+                     .EnableDetailedErrors(true);
     }
 }

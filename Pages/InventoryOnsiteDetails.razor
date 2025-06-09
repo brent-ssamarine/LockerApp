@@ -60,7 +60,7 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var item in displayedItems ?? Enumerable.Empty<InventoryLocationViewModel>())
+                @foreach (var item in displayedItems ?? Enumerable.Empty<InventoryOnsiteViewModel>())
                 {
                     <tr>
                         <input type="hidden" value="@item.InvlocId" />
@@ -214,7 +214,9 @@ else
 
 <MoveInventory Show="@showMoveDialog"
                ShowChanged="@((bool value) => showMoveDialog = value)"
+               ItemId="@(selectedItem?.ItemId ?? string.Empty)"
                ItemName="@(selectedItem?.ItemName ?? string.Empty)"
+               FromLocationId="@(selectedItem?.InvlocId ?? 0)"
                FromLocation="@LocationName"
                Quantity="@(selectedItem?.OnHand ?? 0)"
                Description="@(selectedItem?.Description ?? string.Empty)"
@@ -377,8 +379,8 @@ else
     [SupplyParameterFromQuery]
     public int? Finished { get; set; } = 0;
 
-    private List<InventoryLocationViewModel>? inventoryItems;
-    private List<InventoryLocationViewModel>? displayedItems;
+    private List<InventoryOnsiteViewModel>? inventoryItems;
+    private List<InventoryOnsiteViewModel>? displayedItems;
     private int currentPage = 1;
     private int pageSize = 10;
     private int totalPages => inventoryItems == null ? 0 : (int)Math.Ceiling(inventoryItems.Count / (double)pageSize);
@@ -392,7 +394,7 @@ else
     private DateTime asOfDate = DateTime.Today;
     private bool showMoveDialog;
     private bool showDetailsDialog;
-    private InventoryLocationViewModel? selectedItem;
+    private InventoryOnsiteViewModel? selectedItem;
     private List<string>? asOfDateOptions;
     private string? selectedAsOfDateString;
 
@@ -507,9 +509,9 @@ else
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
 
-            var query = dbContext.InventoryLocations
+            var query = dbContext.InventoryOnsites
                 .FromSqlRaw("SELECT * FROM dbo.inventory_onsite")
-                .Select(il => new InventoryLocationViewModel
+                .Select(il => new InventoryOnsiteViewModel
                 {
                     InvlocId = il.Id,  // Map invloc_id to InvlocId property
                     ItemId = il.ItemId!,
@@ -575,15 +577,16 @@ else
         }
     }
 
-    private void ShowDetails(InventoryLocationViewModel item)
+    private void ShowDetails(InventoryOnsiteViewModel item)
     {
         selectedItem = item;
         showDetailsDialog = true;
     }
 
-    private void MoveInventory(InventoryLocationViewModel item)
+    private void MoveInventory(InventoryOnsiteViewModel item)
     {
-        // TODO: Implement inventory movement
+        selectedItem = item;
+        showMoveDialog = true;
     }
 
     private void GoBack()
@@ -684,7 +687,7 @@ else
         Console.WriteLine("PDF opened in new tab");
     }
 
-    private void ItemNameChanged(InventoryLocationViewModel item, ChangeEventArgs e)
+    private void ItemNameChanged(InventoryOnsiteViewModel item, ChangeEventArgs e)
     {
         item.NewItemName = e.Value?.ToString() ?? item.ItemName;
         item.IsModified = item.NewItemName != item.ItemName || 
@@ -694,7 +697,7 @@ else
         StateHasChanged();
     }
 
-    private void DescriptionChanged(InventoryLocationViewModel item, ChangeEventArgs e)
+    private void DescriptionChanged(InventoryOnsiteViewModel item, ChangeEventArgs e)
     {
         item.NewDescription = e.Value?.ToString() ?? item.Description;
         item.IsModified = item.NewItemName != item.ItemName || 
@@ -704,7 +707,7 @@ else
         StateHasChanged();
     }
 
-    private void BillableChanged(InventoryLocationViewModel item, ChangeEventArgs e)
+    private void BillableChanged(InventoryOnsiteViewModel item, ChangeEventArgs e)
     {
         item.NewIsBillable = (bool)(e.Value ?? item.IsBillable);
         item.IsModified = item.NewItemName != item.ItemName || 
@@ -714,7 +717,7 @@ else
         StateHasChanged();
     }
 
-    private void OnHandChanged(InventoryLocationViewModel item, ChangeEventArgs e)
+    private void OnHandChanged(InventoryOnsiteViewModel item, ChangeEventArgs e)
     {
         if (double.TryParse(e.Value?.ToString(), out double newValue))
         {
@@ -727,29 +730,29 @@ else
         }
     }
 
-    private async Task SaveChanges(InventoryLocationViewModel item)
+    private async Task SaveChanges(InventoryOnsiteViewModel item)
     {
         try
         {
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
 
-            var inventoryLocation = await dbContext.InventoryLocations
+            var inventoryOnsite = await dbContext.InventoryOnsites
                 .Include(il => il.Inventory)
                 .FirstOrDefaultAsync(il => il.ItemId == item.ItemId && il.LocationId == item.LocationId);
 
-            if (inventoryLocation != null)
+            if (inventoryOnsite != null)
             {
                 // Update inventory location
-                inventoryLocation.ItemName = item.NewItemName;
-                inventoryLocation.Description = item.NewDescription;
-                inventoryLocation.OnHand = item.NewOnHand;
+                inventoryOnsite.ItemName = item.NewItemName;
+                inventoryOnsite.Description = item.NewDescription;
+                inventoryOnsite.OnHand = item.NewOnHand;
 
                 // Update inventory
-                if (inventoryLocation.Inventory != null)
+                if (inventoryOnsite.Inventory != null)
                 {
-                    inventoryLocation.Inventory.Name = item.NewItemName;
-                    inventoryLocation.Inventory.Billable = (short)(item.NewIsBillable ? 1 : 0);
+                    inventoryOnsite.Inventory.Name = item.NewItemName;
+                    inventoryOnsite.Inventory.Billable = (short)(item.NewIsBillable ? 1 : 0);
                 }
 
                 await dbContext.SaveChangesAsync();
@@ -771,7 +774,7 @@ else
         }
     }
 
-    private void ShowMoveDialog(InventoryLocationViewModel item)
+    private void ShowMoveDialog(InventoryOnsiteViewModel item)
     {
         selectedItem = item;
         showMoveDialog = true;

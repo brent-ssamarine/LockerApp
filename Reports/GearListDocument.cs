@@ -16,7 +16,7 @@ public class GearListDocument : IDocument
     private readonly string _locationName;
     private readonly string _berth;
     private readonly int _finished;
-    private List<InventoryLocationViewModel>? _gearItems;
+    private List<InventoryOnsiteViewModel>? _gearItems;
 
     public GearListDocument(
         IServiceProvider serviceProvider,
@@ -42,7 +42,7 @@ public class GearListDocument : IDocument
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
 
-        var query = dbContext.InventoryLocations
+        var query = dbContext.InventoryOnsites
             .FromSqlRaw("SELECT * FROM dbo.inventory_onsite")
             .Where(il => il.LocationId == _locationId);
 
@@ -52,8 +52,7 @@ public class GearListDocument : IDocument
             query = query.Where(il => 
                 il.OnHand != 0 && 
                 il.Inventory!.InvType != "MATRL");
-        }
-        // Current location, not finished (_finished = 0): filter zero quantities
+        }        // Current location, not finished (_finished = 0): filter zero quantities
         else if (_finished == 0)
         {
             query = query.Where(il => il.OnHand != 0);
@@ -61,16 +60,22 @@ public class GearListDocument : IDocument
         // Current location, finished (_finished = 1): no additional filters
 
         _gearItems = await query
-            .Select(il => new InventoryLocationViewModel
+            .Select(il => new InventoryOnsiteViewModel
             {
+                InvlocId = il.Id,
                 ItemId = il.ItemId!,
                 ItemName = il.ItemName!,
+                NewItemName = il.ItemName!,
                 Description = il.Description ?? "",
+                NewDescription = il.Description ?? "",
                 LocationId = il.LocationId ?? 0,
                 LocationName = il.Location!.Name!,
                 Berth = il.Location.Berth!,
                 OnHand = il.OnHand ?? 0,
-                IsBillable = il.Inventory!.Billable == 1
+                NewOnHand = il.OnHand ?? 0,
+                IsBillable = il.Inventory!.Billable == 1,
+                NewIsBillable = il.Inventory!.Billable == 1,
+                IsModified = false
             })
             .OrderBy(i => i.ItemName)
             .ToListAsync();

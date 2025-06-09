@@ -1,7 +1,8 @@
 @using AccessMigrationApp.Models.ViewModels
 @using AccessMigrationApp.Models.LockerDB
 @using Microsoft.EntityFrameworkCore
-@inject LockerDbContext LockerDbContext
+@using AccessMigrationApp.Data.LockerDB
+@inject IServiceProvider ServiceProvider
 
 <style>
     .location-select option {
@@ -106,7 +107,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" @onclick="HandleMove">Move</button>
+                    <button type="button" class="btn btn-primary" @onclick="HandleMove" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Move
+                    </button>
+                    <button type="button" class="btn btn-secondary" @onclick="OnClose" disabled="@isProcessing">Close</button>
                 </div>
             </div>
         </div>
@@ -115,6 +123,17 @@
 }
 
 @code {
+    // Debug control - set to false to reduce console output
+    private const bool EnableDebugLogging = true;
+    
+    private void DebugLog(string message)
+    {
+        if (EnableDebugLogging)
+        {
+            Console.WriteLine(message);
+        }
+    }
+
     [Parameter]
     public bool Show { get; set; }
 
@@ -125,7 +144,13 @@
     public string ItemName { get; set; } = "";
 
     [Parameter]
+    public string ItemId { get; set; } = "";
+
+    [Parameter]
     public string FromLocation { get; set; } = "";
+
+    [Parameter]
+    public int FromLocationId { get; set; }
 
     [Parameter]
     public double Quantity { get; set; }
@@ -133,7 +158,6 @@
     [Parameter]
     public EventCallback<bool> OnMoveCompleted { get; set; }
 
-    
     [Parameter]
     public string Description { get; set; } = "";
     
@@ -146,6 +170,7 @@
     private List<LocationViewModel>? locations;
     private List<string>? takenFromOptions;
     private List<string>? asOfDateOptions;
+    private bool isProcessing = false;
 
     private string? _selectedAsOfDateString;
     private string? SelectedAsOfDateString
@@ -163,57 +188,50 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        Note = Description ?? string.Empty; // Always set the note from description
-        TransferQuantity = Quantity; // Always set transfer quantity from Quantity
-        ToLocation = null; // Reset ToLocation each time
-        TakenFrom = null; // Reset TakenFrom
+        Console.WriteLine("=== DEBUG: OnParametersSetAsync() started ===");
+        Console.WriteLine($"DEBUG: Parameters - ItemName: '{ItemName}', ItemId: '{ItemId}', FromLocationId: {FromLocationId}, FromLocation: '{FromLocation}', Quantity: {Quantity}, Description: '{Description}'");
+        
+        Note = Description ?? string.Empty;
+        TransferQuantity = Quantity;
+        ToLocation = null;
+        TakenFrom = null;
+        
+        Console.WriteLine("DEBUG: Loading locations...");
         await LoadLocations();
+        Console.WriteLine($"DEBUG: Loaded {locations?.Count ?? 0} locations");
+        
+        Console.WriteLine("DEBUG: Loading taken from options...");
         await LoadTakenFromOptionsAsync();
+        Console.WriteLine($"DEBUG: Loaded {takenFromOptions?.Count ?? 0} taken from options");
+        
+        Console.WriteLine("DEBUG: Loading as of date options...");
         await LoadAsOfDateOptionsAsync();
+        Console.WriteLine($"DEBUG: Loaded {asOfDateOptions?.Count ?? 0} date options");
 
-        // Reset SelectedAsOfDateString to allow for no default selection
         SelectedAsOfDateString = null;
-        AsOfDate = default; // Or DateTime.MinValue if you prefer for unselected state
+        AsOfDate = default;
+        Console.WriteLine("=== DEBUG: OnParametersSetAsync() completed ===");
     }
 
     private async Task LoadLocations()
     {
         try
         {
-            // Get the current location ID from the parent component
-            var currentLocation = await LockerDbContext.Locations
-                .FirstOrDefaultAsync(l => l.Name == FromLocation);
-                
-            if (currentLocation != null)
-            {
-                locations = await LockerDbContext.Locations
-                    .Where(l => l.Id != currentLocation.Id &&  // Not the current location
-                               l.Finished != 1 &&              // Not finished
-                               l.LocationType != "SUPPLIER" &&   // Not a supplier
-                               l.LocationType != null   ) 
-                    .OrderBy(l => l.Name)
-                    .Select(l => new LocationViewModel 
-                    { 
-                        LocationId = l.Id,
-                        Name = l.Name ?? ""
-                    })
-                    .ToListAsync();
-            }
-            else
-            {
-                // Fallback in case current location is not found
-                locations = await LockerDbContext.Locations
-                    .Where(l => l.Finished != 1 &&
-                               l.LocationType != "SUPPLIER" &&
-                               l.LocationType != null)
-                    .OrderBy(l => l.Name)
-                    .Select(l => new LocationViewModel 
-                    { 
-                        LocationId = l.Id,
-                        Name = l.Name ?? ""
-                    })
-                    .ToListAsync();
-            }
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+            locations = await dbContext.Locations
+                .Where(l => l.Id != FromLocationId &&
+                           l.Finished != 1 &&
+                           l.LocationType != "SUPPLIER" &&
+                           l.LocationType != null)
+                .OrderBy(l => l.Name)
+                .Select(l => new LocationViewModel 
+                { 
+                    LocationId = l.Id,
+                    Name = l.Name ?? ""
+                })
+                .ToListAsync();
         }
         catch (Exception ex)
         {
@@ -225,14 +243,17 @@
     {
         try
         {
-            var locationTypes = await LockerDbContext.Locations
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+            var locationTypes = await dbContext.Locations
                 .Select(l => l.LocationType)
                 .Where(lt => lt != null)
                 .Distinct()
                 .ToListAsync();
 
             takenFromOptions = new List<string>();
-            takenFromOptions.AddRange(locationTypes.Where(lt => lt != null)!); // Ensure no nulls are added
+            takenFromOptions.AddRange(locationTypes.Where(lt => lt != null)!);
             takenFromOptions = takenFromOptions.OrderBy(x => x).ToList();
         }
         catch (Exception ex)
@@ -246,22 +267,22 @@
     {
         try
         {
-            // Get distinct dates from TwoWeeks table
-            var dates = await LockerDbContext.TwoWeeks
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+            var dates = await dbContext.TwoWeeks
                 .Select(t => t.SelectDate)
                 .Distinct()
                 .OrderByDescending(d => d)
                 .Select(d => d.ToString("MM/dd/yyyy"))
                 .ToListAsync();
 
-            // Add today's date if not already present
             var today = DateTime.Today.ToString("MM/dd/yyyy");
             if (!dates.Contains(today))
             {
                 dates.Insert(0, today);
             }
 
-            // If no dates found, add today's date
             if (!dates.Any())
             {
                 dates.Add(today);
@@ -272,16 +293,290 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading 'as of' date options: {ex.Message}");
-            // Fallback to today's date if there's an error
             asOfDateOptions = new List<string> { DateTime.Today.ToString("MM/dd/yyyy") };
         }
     }
 
     private async Task HandleMove()
     {
-        // TODO: Implement the move logic here
-        await OnMoveCompleted.InvokeAsync(true);
-        await OnClose();
+        DebugLog("=== DEBUG: HandleMove() started ===");
+        DebugLog($"DEBUG: Component Parameters - ItemId: '{ItemId}', ItemName: '{ItemName}', FromLocationId: {FromLocationId}, FromLocation: '{FromLocation}', Quantity: {Quantity}");
+        
+        // Validate required fields (matching VBA validation)
+        DebugLog($"DEBUG: Form Values - ToLocation: '{ToLocation}', TakenFrom: '{TakenFrom}', AsOfDate: '{AsOfDate}', TransferQuantity: {TransferQuantity}, Note: '{Note}', InspectedBy: '{InspectedBy}'");
+        
+        if (string.IsNullOrEmpty(ToLocation) || string.IsNullOrEmpty(TakenFrom) || AsOfDate == default)
+        {
+            DebugLog("DEBUG: Validation failed - missing required fields");
+            var missingFields = new List<string>();
+            if (string.IsNullOrEmpty(ToLocation)) missingFields.Add("ToLocation");
+            if (string.IsNullOrEmpty(TakenFrom)) missingFields.Add("TakenFrom");
+            if (AsOfDate == default) missingFields.Add("AsOfDate");
+            DebugLog($"DEBUG: Missing fields: {string.Join(", ", missingFields)}");
+            Console.WriteLine("Please fill in all fields before transferring inventory");
+            return;
+        }
+
+        DebugLog($"DEBUG: Validating quantity - TransferQuantity: {TransferQuantity}, Original Quantity: {Quantity}");
+        if (TransferQuantity <= 0)
+        {
+            Console.WriteLine("DEBUG: Validation failed - invalid transfer quantity");
+            Console.WriteLine("Transfer quantity must be greater than 0");
+            return;
+        }
+
+        Console.WriteLine("DEBUG: All validations passed, starting processing");
+        isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            Console.WriteLine("DEBUG: Starting database operations");
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+            Console.WriteLine("DEBUG: Database context created successfully");
+
+            Console.WriteLine($"DEBUG: Looking for FROM record with ID: {FromLocationId}");
+            // Get the FROM inventory location record
+            var fromRecord = await dbContext.InventoryLocations
+                .FirstOrDefaultAsync(il => il.Id == FromLocationId);
+
+            if (fromRecord == null)
+            {
+                Console.WriteLine($"ERROR: Source inventory record not found for ID: {FromLocationId}");
+                Console.WriteLine("ERROR: No inventory record found at source location");
+                return;
+            }
+            
+            Console.WriteLine($"DEBUG: Found FROM record - ID: {fromRecord.Id}, Item: '{fromRecord.ItemId}', ItemName: '{fromRecord.ItemName}', LocationId: {fromRecord.LocationId}, OnHand: {fromRecord.OnHand}");
+
+            // Validate sufficient quantity
+            if (fromRecord.OnHand < TransferQuantity)
+            {
+                Console.WriteLine($"ERROR: Insufficient quantity - Available: {fromRecord.OnHand}, Requested: {TransferQuantity}");
+                Console.WriteLine($"Insufficient quantity available. Only {fromRecord.OnHand} units available.");
+                return;
+            }
+
+            // Check if TO location already has this item
+            var toLocationId = int.Parse(ToLocation);
+            Console.WriteLine($"DEBUG: Looking for TO record - ItemId: '{fromRecord.ItemId}', LocationId: {toLocationId}");
+            
+            var toRecord = await dbContext.InventoryLocations
+                .FirstOrDefaultAsync(il => il.ItemId == fromRecord.ItemId && il.LocationId == toLocationId);
+
+            // If TO location doesn't have this item, create it
+            if (toRecord == null)
+            {
+                Console.WriteLine("DEBUG: TO record not found, creating new inventory location");
+                
+                try
+                {
+                    // Method 1: Try using Entity Framework with explicit transaction
+                    using var transaction = await dbContext.Database.BeginTransactionAsync();
+                    
+                    toRecord = new InventoryLocation
+                    {
+                        ItemId = fromRecord.ItemId ?? "",
+                        ItemName = fromRecord.ItemName ?? "",
+                        Description = fromRecord.Description ?? "",
+                        Billable = fromRecord.Billable ?? 0,
+                        LocationId = toLocationId,
+                        OnHand = 0.0,
+                        Issued = 0.0
+                    };
+                    
+                    Console.WriteLine("DEBUG: Adding new TO record with Entity Framework");
+                    dbContext.InventoryLocations.Add(toRecord);
+                    await dbContext.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                    
+                    Console.WriteLine($"DEBUG: Successfully created TO record with ID: {toRecord.Id}");
+                }
+                catch (Exception efException)
+                {
+                    Console.WriteLine($"DEBUG: Entity Framework creation failed: {efException.Message}");
+                    Console.WriteLine("DEBUG: Falling back to raw SQL method");
+                    
+                    // Method 2: Fallback to raw SQL with explicit connection management
+                    try
+                    {
+                        var insertSql = @"
+                            INSERT INTO [dbo].[inventory_locations] ([item], [item_name], [description], [billable], [location], [onhand], [issued])
+                            OUTPUT INSERTED.[invloc_id]
+                            VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6)";
+                            
+                        var parameters = new object[] { 
+                            fromRecord.ItemId ?? "", 
+                            fromRecord.ItemName ?? "", 
+                            fromRecord.Description ?? "", 
+                            fromRecord.Billable ?? 0, 
+                            toLocationId, 
+                            0.0, 
+                            0.0 
+                        };
+                        
+                        Console.WriteLine("DEBUG: Executing raw SQL to create TO record");
+                        var result = await dbContext.Database.SqlQueryRaw<int>(insertSql, parameters).ToListAsync();
+                        var newId = result.FirstOrDefault();
+                        
+                        if (newId > 0)
+                        {
+                            Console.WriteLine($"DEBUG: Created new TO record with ID: {newId}");
+                            
+                            // Reload the record from the database
+                            toRecord = await dbContext.InventoryLocations.FirstOrDefaultAsync(il => il.Id == newId);
+                            if (toRecord == null)
+                            {
+                                Console.WriteLine("ERROR: Failed to reload newly created TO record");
+                                return;
+                            }
+                            Console.WriteLine($"DEBUG: Reloaded TO record - ID: {toRecord.Id}, OnHand: {toRecord.OnHand}");
+                        }
+                        else
+                        {
+                            Console.WriteLine("ERROR: Raw SQL insertion did not return a valid ID");
+                            return;
+                        }
+                    }
+                    catch (Exception sqlException)
+                    {
+                        Console.WriteLine($"ERROR: Raw SQL creation also failed: {sqlException.Message}");
+                        Console.WriteLine("ERROR: Unable to create inventory location record at destination");
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"DEBUG: Found existing TO record - ID: {toRecord.Id}, OnHand: {toRecord.OnHand}, LocationId: {toRecord.LocationId}");
+            }
+
+            Console.WriteLine("DEBUG: Creating inventory transfer record");
+            Console.WriteLine($"DEBUG: Transfer details - Quantity: {TransferQuantity}, FromLocationID: {fromRecord.Id}, ToLocationID: {toRecord.Id}, Company: WES, Job: MOVE, TakenFrom: {TakenFrom}, Date: {AsOfDate:yyyy-MM-dd}");
+            
+            // Create the inventory transfer record (equivalent to write_inventory_transfer)
+            WriteInventoryTransfer(
+                dbContext,
+                TransferQuantity,
+                Note,
+                fromRecord,
+                toRecord,
+                "WES", // Company
+                "MOVE", // Job
+                TakenFrom,
+                AsOfDate,
+                null, // PONumber
+                0, // CostPer
+                0, // LockerTotal
+                0, // InventoryTotal
+                InspectedBy
+            );
+            Console.WriteLine("DEBUG: Inventory transfer record created");
+
+            Console.WriteLine("DEBUG: Updating inventory locations");
+            Console.WriteLine($"DEBUG: BEFORE Update - FROM OnHand: {fromRecord.OnHand}, TO OnHand: {toRecord.OnHand}");
+            
+            // Update inventory locations (equivalent to update_inv_locations)
+            UpdateInventoryLocations(dbContext, TransferQuantity, fromRecord, toRecord);
+            
+            Console.WriteLine($"DEBUG: AFTER Update - FROM OnHand: {fromRecord.OnHand}, TO OnHand: {toRecord.OnHand}");
+            Console.WriteLine("DEBUG: Saving all changes to database");
+            
+            await dbContext.SaveChangesAsync();
+            Console.WriteLine("DEBUG: Database save completed successfully");
+
+            Console.WriteLine("DEBUG: Transfer completed successfully, triggering callbacks");
+            await OnMoveCompleted.InvokeAsync(true);
+            await OnClose();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: Exception during inventory transfer: {ex.Message}");
+            Console.WriteLine($"ERROR: Stack trace: {ex.StackTrace}");
+            // TODO: Show error message to user
+        }
+        finally
+        {
+            Console.WriteLine("DEBUG: Cleaning up - setting isProcessing to false");
+            isProcessing = false;
+            StateHasChanged();
+        }
+        
+        Console.WriteLine("=== DEBUG: HandleMove() completed ===");
+    }
+
+    // Equivalent to VBA write_inventory_transfer function
+    private void WriteInventoryTransfer(
+        LockerDbContext dbContext,
+        double quantity,
+        string description,
+        InventoryLocation fromLocation,
+        InventoryLocation toLocation,
+        string company,
+        string job,
+        string takenFrom,
+        DateTime transferDate,
+        string? poNumber,
+        double costPer,
+        double lockerTotal,
+        double inventoryTotal,
+        string inspectedBy)
+    {
+        Console.WriteLine("DEBUG: WriteInventoryTransfer() - Creating transfer record");
+        
+        var transfer = new InvTran
+        {
+            ItemId = fromLocation.ItemId?.Trim(),
+            ItemName = fromLocation.ItemName?.Trim(),
+            ItemDescription = description,
+            Quantity = quantity,
+            Company = company,
+            Job = job,
+            FromLocation = fromLocation.Id,
+            ToLocation = toLocation.Id,
+            TakenFrom = takenFrom,
+            TransferDate = transferDate,
+            PONumber = poNumber,
+            CostPer = costPer,
+            InspectedBy = inspectedBy
+        };
+
+        Console.WriteLine($"DEBUG: Transfer Record - ItemId: '{transfer.ItemId}', ItemName: '{transfer.ItemName}', Quantity: {transfer.Quantity}");
+        Console.WriteLine($"DEBUG: Transfer Record - FromLocation: {transfer.FromLocation}, ToLocation: {transfer.ToLocation}, Date: {transfer.TransferDate:yyyy-MM-dd}");
+        Console.WriteLine($"DEBUG: Transfer Record - Company: '{transfer.Company}', Job: '{transfer.Job}', TakenFrom: '{transfer.TakenFrom}', InspectedBy: '{transfer.InspectedBy}'");
+
+        dbContext.InvTrans.Add(transfer);
+        Console.WriteLine("DEBUG: Transfer record added to context");
+    }
+
+    // Equivalent to VBA update_inv_locations function
+    private void UpdateInventoryLocations(
+        LockerDbContext dbContext,
+        double quantity,
+        InventoryLocation fromLocation,
+        InventoryLocation toLocation)
+    {
+        Console.WriteLine("DEBUG: UpdateInventoryLocations() - Starting inventory updates");
+        Console.WriteLine($"DEBUG: Transfer quantity: {quantity}");
+        Console.WriteLine($"DEBUG: FROM location BEFORE - ID: {fromLocation.Id}, OnHand: {fromLocation.OnHand}");
+        Console.WriteLine($"DEBUG: TO location BEFORE - ID: {toLocation.Id}, OnHand: {toLocation.OnHand}");
+
+        // Decrease quantity from source location
+        var originalFromOnHand = fromLocation.OnHand ?? 0;
+        fromLocation.OnHand = originalFromOnHand - quantity;
+
+        // Increase quantity at destination location  
+        var originalToOnHand = toLocation.OnHand ?? 0;
+        toLocation.OnHand = originalToOnHand + quantity;
+
+        Console.WriteLine($"DEBUG: FROM location AFTER - ID: {fromLocation.Id}, OnHand: {fromLocation.OnHand} (was {originalFromOnHand})");
+        Console.WriteLine($"DEBUG: TO location AFTER - ID: {toLocation.Id}, OnHand: {toLocation.OnHand} (was {originalToOnHand})");
+
+        // Update both records
+        dbContext.InventoryLocations.Update(fromLocation);
+        dbContext.InventoryLocations.Update(toLocation);
+        Console.WriteLine("DEBUG: Both inventory location records updated in context");
     }
 
     private async Task OnClose()
