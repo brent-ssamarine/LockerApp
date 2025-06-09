@@ -25,8 +25,7 @@ public class LockerDbContext : DbContext
     public DbSet<InventoryOnsite> InventoryOnsites { get; set; }
     public DbSet<InvTran> InvTrans { get; set; }
     public DbSet<TestClass> TestClasses { get; set; }
-    public DbSet<TwoWeek> TwoWeeks { get; set; }
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    public DbSet<TwoWeek> TwoWeeks { get; set; }    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("dbo");
@@ -44,9 +43,7 @@ public class LockerDbContext : DbContext
         modelBuilder.Entity<InvTran>()
             .Property(e => e.Id)
             .ValueGeneratedOnAdd();
-    }
-    
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    }protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         base.OnConfiguring(optionsBuilder);
         

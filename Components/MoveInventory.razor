@@ -370,81 +370,55 @@
             {
                 Console.WriteLine("DEBUG: TO record not found, creating new inventory location");
                 
+                // Use raw SQL approach directly to avoid Entity Framework trigger issues
                 try
                 {
-                    // Method 1: Try using Entity Framework with explicit transaction
-                    using var transaction = await dbContext.Database.BeginTransactionAsync();
-                    
-                    toRecord = new InventoryLocation
-                    {
-                        ItemId = fromRecord.ItemId ?? "",
-                        ItemName = fromRecord.ItemName ?? "",
-                        Description = fromRecord.Description ?? "",
-                        Billable = fromRecord.Billable ?? 0,
-                        LocationId = toLocationId,
-                        OnHand = 0.0,
-                        Issued = 0.0
+                    // Insert the record without OUTPUT clause (invloc_id will be auto-generated as IDENTITY)
+                    var insertSql = @"
+                        INSERT INTO [dbo].[inventory_locations] ([item], [item_name], [description], [billable], [location], [onhand], [issued])
+                        VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6)";
+                        
+                    var parameters = new object[] { 
+                        fromRecord.ItemId ?? "", 
+                        fromRecord.ItemName ?? "", 
+                        fromRecord.Description ?? "", 
+                        fromRecord.Billable ?? 0, 
+                        toLocationId, 
+                        0.0, 
+                        0.0 
                     };
                     
-                    Console.WriteLine("DEBUG: Adding new TO record with Entity Framework");
-                    dbContext.InventoryLocations.Add(toRecord);
-                    await dbContext.SaveChangesAsync();
-                    await transaction.CommitAsync();
+                    Console.WriteLine("DEBUG: Executing raw SQL to create TO record (avoiding Entity Framework trigger conflicts)");
+                    var rowsAffected = await dbContext.Database.ExecuteSqlRawAsync(insertSql, parameters);
                     
-                    Console.WriteLine($"DEBUG: Successfully created TO record with ID: {toRecord.Id}");
-                }
-                catch (Exception efException)
-                {
-                    Console.WriteLine($"DEBUG: Entity Framework creation failed: {efException.Message}");
-                    Console.WriteLine("DEBUG: Falling back to raw SQL method");
-                    
-                    // Method 2: Fallback to raw SQL with explicit connection management
-                    try
+                    if (rowsAffected > 0)
                     {
-                        var insertSql = @"
-                            INSERT INTO [dbo].[inventory_locations] ([item], [item_name], [description], [billable], [location], [onhand], [issued])
-                            OUTPUT INSERTED.[invloc_id]
-                            VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6)";
-                            
-                        var parameters = new object[] { 
-                            fromRecord.ItemId ?? "", 
-                            fromRecord.ItemName ?? "", 
-                            fromRecord.Description ?? "", 
-                            fromRecord.Billable ?? 0, 
-                            toLocationId, 
-                            0.0, 
-                            0.0 
-                        };
+                        Console.WriteLine($"DEBUG: Insert successful, {rowsAffected} rows affected");
                         
-                        Console.WriteLine("DEBUG: Executing raw SQL to create TO record");
-                        var result = await dbContext.Database.SqlQueryRaw<int>(insertSql, parameters).ToListAsync();
-                        var newId = result.FirstOrDefault();
-                        
-                        if (newId > 0)
-                        {
-                            Console.WriteLine($"DEBUG: Created new TO record with ID: {newId}");
+                        // Find the newly created record
+                        toRecord = await dbContext.InventoryLocations
+                            .Where(il => il.ItemId == fromRecord.ItemId && il.LocationId == toLocationId)
+                            .OrderByDescending(il => il.Id) // Get the most recent one
+                            .FirstOrDefaultAsync();
                             
-                            // Reload the record from the database
-                            toRecord = await dbContext.InventoryLocations.FirstOrDefaultAsync(il => il.Id == newId);
-                            if (toRecord == null)
-                            {
-                                Console.WriteLine("ERROR: Failed to reload newly created TO record");
-                                return;
-                            }
-                            Console.WriteLine($"DEBUG: Reloaded TO record - ID: {toRecord.Id}, OnHand: {toRecord.OnHand}");
-                        }
-                        else
+                        if (toRecord == null)
                         {
-                            Console.WriteLine("ERROR: Raw SQL insertion did not return a valid ID");
+                            Console.WriteLine("ERROR: Failed to find newly created TO record");
                             return;
                         }
+                        Console.WriteLine($"DEBUG: Found newly created TO record - ID: {toRecord.Id}, OnHand: {toRecord.OnHand}");
                     }
-                    catch (Exception sqlException)
+                    else
                     {
-                        Console.WriteLine($"ERROR: Raw SQL creation also failed: {sqlException.Message}");
-                        Console.WriteLine("ERROR: Unable to create inventory location record at destination");
+                        Console.WriteLine("ERROR: Raw SQL insertion did not affect any rows");
                         return;
                     }
+                }
+                catch (Exception sqlException)
+                {
+                    Console.WriteLine($"ERROR: Raw SQL creation failed: {sqlException.Message}");
+                    Console.WriteLine("ERROR: Unable to create inventory location record at destination");
+                    return;
                 }
             }
             else
@@ -456,7 +430,7 @@
             Console.WriteLine($"DEBUG: Transfer details - Quantity: {TransferQuantity}, FromLocationID: {fromRecord.Id}, ToLocationID: {toRecord.Id}, Company: WES, Job: MOVE, TakenFrom: {TakenFrom}, Date: {AsOfDate:yyyy-MM-dd}");
             
             // Create the inventory transfer record (equivalent to write_inventory_transfer)
-            WriteInventoryTransfer(
+            await WriteInventoryTransferAsync(
                 dbContext,
                 TransferQuantity,
                 Note,
@@ -481,8 +455,9 @@
             UpdateInventoryLocations(dbContext, TransferQuantity, fromRecord, toRecord);
             
             Console.WriteLine($"DEBUG: AFTER Update - FROM OnHand: {fromRecord.OnHand}, TO OnHand: {toRecord.OnHand}");
-            Console.WriteLine("DEBUG: Saving all changes to database");
+            Console.WriteLine("DEBUG: Saving inventory location changes to database");
             
+            // Only save the inventory location updates since transfer record was inserted via raw SQL
             await dbContext.SaveChangesAsync();
             Console.WriteLine("DEBUG: Database save completed successfully");
 
@@ -507,7 +482,7 @@
     }
 
     // Equivalent to VBA write_inventory_transfer function
-    private void WriteInventoryTransfer(
+    private async Task WriteInventoryTransferAsync(
         LockerDbContext dbContext,
         double quantity,
         string description,
@@ -523,31 +498,53 @@
         double inventoryTotal,
         string inspectedBy)
     {
-        Console.WriteLine("DEBUG: WriteInventoryTransfer() - Creating transfer record");
+        Console.WriteLine("DEBUG: WriteInventoryTransfer() - Creating transfer record using raw SQL");
         
-        var transfer = new InvTran
+        try
         {
-            ItemId = fromLocation.ItemId?.Trim(),
-            ItemName = fromLocation.ItemName?.Trim(),
-            ItemDescription = description,
-            Quantity = quantity,
-            Company = company,
-            Job = job,
-            FromLocation = fromLocation.Id,
-            ToLocation = toLocation.Id,
-            TakenFrom = takenFrom,
-            TransferDate = transferDate,
-            PONumber = poNumber,
-            CostPer = costPer,
-            InspectedBy = inspectedBy
-        };
-
-        Console.WriteLine($"DEBUG: Transfer Record - ItemId: '{transfer.ItemId}', ItemName: '{transfer.ItemName}', Quantity: {transfer.Quantity}");
-        Console.WriteLine($"DEBUG: Transfer Record - FromLocation: {transfer.FromLocation}, ToLocation: {transfer.ToLocation}, Date: {transfer.TransferDate:yyyy-MM-dd}");
-        Console.WriteLine($"DEBUG: Transfer Record - Company: '{transfer.Company}', Job: '{transfer.Job}', TakenFrom: '{transfer.TakenFrom}', InspectedBy: '{transfer.InspectedBy}'");
-
-        dbContext.InvTrans.Add(transfer);
-        Console.WriteLine("DEBUG: Transfer record added to context");
+            // Use raw SQL to insert into the view/table to avoid Entity Framework view issues
+            var insertSql = @"
+                INSERT INTO [dbo].[invtran] ([item], [item_name], [item_desc], [from_location], [to_location], [company], [job], [taken_from], [transfer_date], [quantity], [costper], [ponum], [inspected_by])
+                VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12)";
+                
+            var parameters = new object[] { 
+                fromLocation.ItemId?.Trim() ?? "", 
+                fromLocation.ItemName?.Trim() ?? "", 
+                description ?? "", 
+                fromLocation.Id, 
+                toLocation.Id, 
+                company ?? "", 
+                job ?? "", 
+                takenFrom ?? "", 
+                transferDate, 
+                quantity, 
+                costPer, 
+                poNumber ?? (object?)null, 
+                inspectedBy ?? ""
+            };
+            
+            Console.WriteLine($"DEBUG: Transfer Record - ItemId: '{fromLocation.ItemId?.Trim()}', ItemName: '{fromLocation.ItemName?.Trim()}', Quantity: {quantity}");
+            Console.WriteLine($"DEBUG: Transfer Record - FromLocation: {fromLocation.Id}, ToLocation: {toLocation.Id}, Date: {transferDate:yyyy-MM-dd}");
+            Console.WriteLine($"DEBUG: Transfer Record - Company: '{company}', Job: '{job}', TakenFrom: '{takenFrom}', InspectedBy: '{inspectedBy}'");
+            
+            Console.WriteLine("DEBUG: Executing raw SQL to create transfer record (avoiding Entity Framework view conflicts)");
+            var rowsAffected = await dbContext.Database.ExecuteSqlRawAsync(insertSql, parameters);
+            
+            if (rowsAffected > 0)
+            {
+                Console.WriteLine($"DEBUG: Transfer record insert successful, {rowsAffected} rows affected");
+            }
+            else
+            {
+                Console.WriteLine("ERROR: Transfer record raw SQL insertion did not affect any rows");
+                throw new InvalidOperationException("Failed to create transfer record");
+            }
+        }
+        catch (Exception sqlException)
+        {
+            Console.WriteLine($"ERROR: Raw SQL transfer record creation failed: {sqlException.Message}");
+            throw new InvalidOperationException("Unable to create transfer record", sqlException);
+        }
     }
 
     // Equivalent to VBA update_inv_locations function
