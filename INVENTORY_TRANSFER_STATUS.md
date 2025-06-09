@@ -111,7 +111,7 @@ DEBUG: Database save completed successfully
 ### Core Components:
 - `Components/MoveInventory.razor` - Complete inventory transfer implementation
 - `Data/LockerDB/LockerDbContext.cs` - Enhanced trigger compatibility
-- `Pages/InventoryOnsiteDetails.razor` - Fixed parameter passing
+- `Pages/InventoryOnsite.razor` - Fixed parameter passing
 
 ### Models:
 - `Models/LockerDB/Models.cs` - InvTran model with proper key configuration
@@ -138,7 +138,7 @@ DEBUG: Database save completed successfully
 
 1. **Database Trigger Conflicts** - ✅ Fixed with dual creation strategy
 2. **Null Reference Warnings** - ✅ Fixed with proper null handling
-3. **Parameter Missing Issues** - ✅ Fixed in InventoryOnsiteDetails.razor
+3. **Parameter Missing Issues** - ✅ Fixed in InventoryOnsite.razor
 4. **DbContext Concurrency** - ✅ Fixed with IServiceProvider pattern
 
 The inventory transfer functionality is now fully operational and ready for production use!

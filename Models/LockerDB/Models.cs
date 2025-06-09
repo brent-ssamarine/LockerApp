@@ -401,6 +401,44 @@ public class TwoWeek
     public DateTime SelectDate { get; set; }
 }
 
+[Table("recap")]
+public class Recap
+{
+    [Key]
+    [Column("invloc_id")]
+    public int invlocId { get; set; }
+    
+    [Column("location")]
+    public string? Location { get; set; }
+    
+    [Column("item_id")]
+    public string? ItemId { get; set; }
+    
+    [Column("item_name")]
+    public string? ItemName { get; set; }
+
+    [Column("onhand")]
+    public double? OnHand { get; set; }
+
+    [Column("description")]
+    public string? Description { get; set; }
+
+    [Column("loc_type")]
+    public string? LocationType { get; set; }
+    
+    [Column("transfer_date")]
+    public DateTime? TransferDate { get; set; }
+
+    [Column("quantity")]
+    public double? Quantity { get; set; }
+
+    [Column("consumed")]
+    public int Consumed { get; set; }
+
+    [Column("inspected_by")]
+    public string? InspectedBy { get; set; }
+}
+
 [Table("inventory_onsite")]
 public class InventoryOnsite
 {
@@ -490,4 +528,42 @@ public class InvTran
     public string? InspectedBy { get; set; }
     
     // Removed locker and onhand columns as they don't exist in the view
+}
+
+[Keyless]
+[Table("rptRecap")]
+public class RptRecap
+{
+    [Column("location")]
+    public int? Location { get; set; }
+    
+    [Column("invloc_id")]
+    public int? InvLocId { get; set; }
+    
+    [Column("item")]
+    public string? Item { get; set; }
+    
+    [Column("item_name")]
+    public string? ItemName { get; set; }
+    
+    [Column("onhand")]
+    public double? OnHand { get; set; }
+    
+    [Column("description")]
+    public string? Description { get; set; }
+    
+    [Column("loc_type")]
+    public string? LocType { get; set; }
+    
+    [Column("consumed")]
+    public short? Consumed { get; set; }
+    
+    [Column("transfer_date")]
+    public DateTime? TransferDate { get; set; }
+    
+    [Column("quantity")]
+    public double? Quantity { get; set; }
+    
+    [Column("inspected_by")]
+    public string? InspectedBy { get; set; }
 }

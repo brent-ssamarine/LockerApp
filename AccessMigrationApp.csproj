@@ -25,7 +25,6 @@
   <ItemGroup>
     <Compile Remove="Reports\JobListDocument.cs" />
     <Compile Remove="Reports\MaterialListDocument.cs" />
-    <Compile Remove="Reports\RecapDocument.cs" />
     <Compile Remove="Reports\RecapInspectedBySubDocument.cs" />
     <Compile Remove="Reports\TestSchedulerDocument.cs" />
     <Compile Remove="Reports\Pending\**" />
@@ -40,3 +39,4 @@
   </ItemGroup>
 
 </Project>
+
