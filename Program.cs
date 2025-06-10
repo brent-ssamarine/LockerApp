@@ -70,31 +70,10 @@ public class Program
         app.UseHttpsRedirection();
         app.UseStaticFiles();
         app.UseRouting();
-        app.UseAuthorization();        app.MapControllers();
+        app.UseAuthorization();
+        app.MapControllers();
         app.MapBlazorHub();
-        app.MapFallbackToPage("/_Host");        // API endpoint for generating Recap PDF
-        app.MapGet("/api/reports/recap", async (
-            IReportService reportService,
-            DateTime? startDate = null,
-            DateTime? endDate = null,
-            string inspectedBy = "",
-            int? locationId = null) =>
-        {
-            try
-            {
-                // Default to last 30 days if no dates provided
-                var start = startDate ?? DateTime.Now.AddDays(-30);
-                var end = endDate ?? DateTime.Now;
-                
-                var pdfBytes = await reportService.GenerateRecapPdf(start, end, inspectedBy ?? "", locationId);
-                
-                return Results.File(pdfBytes, "application/pdf", $"recap_report_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Error generating recap report: {ex.Message}");
-            }
-        });
+        app.MapFallbackToPage("/_Host");
 
         app.Run();
     }

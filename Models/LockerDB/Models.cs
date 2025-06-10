@@ -528,6 +528,37 @@ public class InvTran
     
     [Column("inspected_by")]
     public string? InspectedBy { get; set; }
+}
+
+[Table("materiallist")]
+public class MaterialList
+{
+    [Key]
+    [Column("loc_id")]
+    public int LocationId { get; set; }
     
+    [Column("from_locname")]
+    public string? FromLocationName { get; set; }
+    
+    [Column("description")]
+    public string? Description { get; set; }
+    
+    [Column("berth")]
+    public string? Berth { get; set; }
+    
+    [Column("start_date")]
+    public DateTime? StartDate { get; set; }
+    
+    [Column("item_name")]
+    public string? ItemName { get; set; }
+    
+    [Column("quantity")]
+    public float? Quantity { get; set; }
+    
+    [Column("to_locname")]
+    public string? ToLocationName { get; set; }
+    
+    [Column("inv_type")]
+    public string? InvType { get; set; }
 }
 

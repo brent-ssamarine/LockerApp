@@ -153,7 +153,10 @@ else
                 </select>
             </div>
             <div class="col-auto">
-                <button class="btn btn-primary" @onclick="PrintInventoryList" disabled="@(!CanPrint)">Print</button>
+                <button class="btn btn-primary" @onclick="PrintInventoryList" disabled="@(!CanPrint)">Print Gear List</button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" @onclick="PrintMaterials" disabled="@(!CanPrint)">Print Materials</button>
             </div>
             <div class="col-auto">
                 <label>Transfer Remaining inventory</label>
@@ -718,11 +721,41 @@ else
             Console.WriteLine($"Error generating recap PDF: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
-    }    private void PrintMaterials()
+    }    private async Task PrintMaterials()
     {
-        Console.WriteLine("Materials print functionality not yet implemented...");
-        // TODO: Implement materials printing functionality
-        // This would likely filter inventory items by type = "MATRL" or similar
+        Console.WriteLine("Starting materials print...");
+        
+        try
+        {
+            if (!LocationId.HasValue)
+            {
+                Console.WriteLine("No location selected");
+                return;
+            }
+
+            var selectedLocation = allLocations?.FirstOrDefault(l => l.LocationId == LocationId);
+            if (selectedLocation == null)
+            {
+                Console.WriteLine($"Current location not found: {LocationId}");
+                return;
+            }
+
+            Console.WriteLine($"Generating material list PDF for location {LocationId}...");
+            
+            // Generate material list for the current location
+            var pdfBytes = await ReportService.GenerateMaterialListPdf(
+                LocationId.Value,
+                selectedLocation.Name,
+                selectedLocation.Berth,
+                DateTime.Today);
+            
+            await ShowPdf(pdfBytes, LocationId.Value);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error generating material list PDF: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
     }
 
     private async Task ShowRecapPdf(byte[] pdfBytes)

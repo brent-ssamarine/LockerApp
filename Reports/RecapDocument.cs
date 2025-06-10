@@ -251,30 +251,29 @@ public class RecapDocument : BaseDocument
                     else
                     {
                         longName = $"{item.ItemName?.Trim()} - {item.Description.Trim()}";
-                    }
-
-                    table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(1).PaddingRight(5).Text(outQty);
+                    }                    table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(1).PaddingRight(5).Text(outQty);
                     table.Cell().Border(0.25f).BorderColor(Colors.Black).PaddingVertical(2).PaddingLeft(5).Text(longName);
                     table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(retnQty);
                     table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(usedQty);
                     table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(otherQty);
                 }
             });
-        });
-    }    private void ComposeFooter(IContainer container)
-    {
-        container.Column(column =>
-        {            column.Item().PaddingTop(20).AlignLeft().Text(text =>
+
+            // Add inspection section at the end of the content
+            column.Item().PaddingTop(30).AlignLeft().Text(text =>
             {
                 text.DefaultTextStyle(x => x.FontSize(10));
                 text.Span("Upon return of the above Gear & Equipment, inspection was assigned to the following:");
             });
-              column.Item().PaddingTop(15).AlignCenter().Column(col =>
+
+            column.Item().PaddingTop(15).AlignCenter().Column(col =>
             {
-                col.Item().Text("Inspected by:").FontSize(10);
-                col.Item().PaddingTop(20).LineHorizontal(1).LineColor(Colors.Black);
-                col.Item().PaddingTop(5).Text(_inspectedBy).FontSize(10).AlignCenter();
+                col.Item().PaddingTop(5).Text(_inspectedBy).FontSize(10).AlignLeft();
+                col.Item().PaddingTop(20).PaddingHorizontal(50).LineHorizontal(2).LineColor(Colors.Black);
             });
         });
+    }    private void ComposeFooter(IContainer container)
+    {
+        // Footer is now empty - inspection section moved to content
     }
 }

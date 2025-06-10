@@ -24,6 +24,7 @@ public class LockerDbContext : DbContext
     public DbSet<LockerInventory> LockerInventories { get; set; }
     public DbSet<InventoryOnsite> InventoryOnsites { get; set; }
     public DbSet<InvTran> InvTrans { get; set; }
+    public DbSet<MaterialList> MaterialLists { get; set; }
     public DbSet<TestClass> TestClasses { get; set; }
     public DbSet<TwoWeek> TwoWeeks { get; set; }
     public DbSet<Recap> Recaps { get; set; }

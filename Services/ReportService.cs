@@ -7,7 +7,7 @@ public interface IReportService
 {
     Task<byte[]> GenerateGearListPdf(int locationId, string locationName, string berth, int finished);
     Task<byte[]> GenerateRecapPdf(DateTime startDate, DateTime endDate, string inspectedBy, int? locationId = null);
-    // Task<byte[]> GenerateMaterialsListPdf(int locationId, string locationName, string berth, DateTime startDate, DateTime endDate);
+    Task<byte[]> GenerateMaterialListPdf(int? locationId, string locationName, string berth, DateTime startDate);
     // Task<byte[]> GenerateJobListPdf(DateTime startDate, DateTime endDate, string? jobType = null);
     // Task<byte[]> GenerateRecapInspectedBySubPdf(DateTime startDate, DateTime endDate, string subInspector);
     // Task<byte[]> GenerateTestSchedulerPdf(DateTime startDate, DateTime endDate, string? testType = null);
@@ -35,4 +35,11 @@ public class ReportService : IReportService
         await document.PrepareAsync();
         return document.GeneratePdf();
     }
-} 
+
+    public async Task<byte[]> GenerateMaterialListPdf(int? locationId, string locationName, string berth, DateTime startDate)
+    {
+        var document = new AccessMigrationApp.Reports.MaterialListDocument(_serviceProvider, locationId, locationName, berth, startDate);
+        await document.PrepareAsync();
+        return document.GeneratePdf();
+    }
+}
