@@ -80,10 +80,10 @@ public class RecapDocument : BaseDocument
                         text.Span("For the  ").FontSize(10);
                         text.Span(_locationName).Bold().FontSize(10);
                     });
-                    c.Item().Text(_voyageNumber).FontSize(10);
+                    c.Item().Text($"         {_voyageNumber}").FontSize(10);
                 });
 
-                row.RelativeItem().AlignCenter().Text(text =>
+                row.RelativeItem().AlignLeft().Text(text =>
                 {
                     text.Span("Berth  ").FontSize(10);
                     text.Span(_berth).Bold().FontSize(10);
