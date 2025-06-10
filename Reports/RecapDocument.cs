@@ -74,30 +74,27 @@ public class RecapDocument : BaseDocument
 
     private async Task LoadData()
     {
-        if (_recapItems != null) return;
-
-        using var scope = ServiceProvider.CreateScope();
+        if (_recapItems != null) return;        using var scope = ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
 
-        var query = dbContext.RptRecaps
-            .Where(r => r.TransferDate >= _startDate && r.TransferDate <= _endDate);        if (!string.IsNullOrEmpty(_inspectedBy))
+        var query = dbContext.Recaps
+            .Where(r => r.TransferDate >= _startDate && r.TransferDate <= _endDate);
+        if (!string.IsNullOrEmpty(_inspectedBy))
         {
             query = query.Where(r => r.InspectedBy == _inspectedBy);
-        }
-
-        _recapItems = await query
+        }        _recapItems = await query
             .Select(r => new RecapViewModel
             {
-                InvLocId = r.InvLocId ?? 0,
-                Location = r.Location != null ? r.Location.ToString() : "",
-                ItemId = r.Item ?? "",
+                InvLocId = r.invlocId,
+                Location = r.Location,
+                ItemId = r.ItemId ?? "",
                 ItemName = r.ItemName ?? "",
                 OnHand = r.OnHand ?? 0,
                 Description = r.Description ?? "",
-                LocationType = r.LocType ?? "",
+                LocationType = r.LocationType ?? "",
                 TransferDate = r.TransferDate,
                 Quantity = r.Quantity ?? 0,
-                Consumed = r.Consumed.HasValue ? (r.Consumed.Value == 1 ? 1 : 0) : 0,
+                Consumed = r.Consumed,
                 InspectedBy = r.InspectedBy ?? ""
             })
             .OrderBy(r => r.TransferDate)
@@ -137,12 +134,10 @@ public class RecapDocument : BaseDocument
                             row.RelativeItem().Text(item.FormattedTransferDate).Style(HeaderStyle);
                         });
                         currentDate = item.TransferDate;
-                    }
-
-                    column.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(2).Row(row =>
+                    }                    column.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(2).Row(row =>
                     {
                         row.RelativeItem(2).Text(item.FormattedTransferDate).Style(DefaultTextStyle);
-                        row.RelativeItem(1).Text(item.Location).Style(DefaultTextStyle);
+                        row.RelativeItem(1).Text(item.Location?.ToString() ?? "").Style(DefaultTextStyle);
                         row.RelativeItem(3).Text(item.ItemName ?? "").Style(DefaultTextStyle);
                         row.RelativeItem(2).Text(item.Description ?? "").Style(DefaultTextStyle);
                         row.RelativeItem(1).AlignRight().Text(item.FormattedQuantity).Style(DefaultTextStyle);
@@ -164,10 +159,9 @@ public class RecapDocument : BaseDocument
                 {
                     row.RelativeItem().Column(c =>                    {
                         c.Item().Text("Summary by Location").Style(HeaderStyle);
-                        
-                        var locationSummary = _recapItems
+                          var locationSummary = _recapItems
                             .GroupBy(r => r.Location)
-                            .Select(g => new { Location = g.Key ?? "Unknown", Count = g.Count() })
+                            .Select(g => new { Location = g.Key?.ToString() ?? "Unknown", Count = g.Count() })
                             .OrderBy(s => s.Location);
 
                         foreach (var item in locationSummary)

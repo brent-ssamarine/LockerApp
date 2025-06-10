@@ -5,7 +5,7 @@ namespace AccessMigrationApp.Models.ViewModels
     public class RecapViewModel
     {
         public int InvLocId { get; set; }
-        public string? Location { get; set; }
+        public int? Location { get; set; }
         public string? ItemId { get; set; }
         public string? ItemName { get; set; }
         public double? OnHand { get; set; }
@@ -13,7 +13,7 @@ namespace AccessMigrationApp.Models.ViewModels
         public string? LocationType { get; set; }
         public DateTime? TransferDate { get; set; }
         public double? Quantity { get; set; }
-        public int Consumed { get; set; }
+        public short Consumed { get; set; }
         public string? InspectedBy { get; set; }
         
         // UI-specific properties
@@ -63,10 +63,9 @@ namespace AccessMigrationApp.Models.ViewModels
                 ItemName = ItemName,
                 OnHand = OnHand,
                 Description = Description,
-                LocationType = LocationType,
-                TransferDate = TransferDate,
+                LocationType = LocationType,                TransferDate = TransferDate,
                 Quantity = Quantity,
-                Consumed = Consumed,
+                Consumed = (short)Consumed,
                 InspectedBy = InspectedBy
             };
         }
