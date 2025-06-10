@@ -80,7 +80,7 @@ public class RecapDocument : BaseDocument
                         text.Span("For the  ").FontSize(10);
                         text.Span(_locationName).Bold().FontSize(10);
                     });
-                    c.Item().Text($"         {_voyageNumber}").FontSize(10);
+                    c.Item().Text($"               {_voyageNumber}").Bold().FontSize(10);
                 });
 
                 row.RelativeItem().AlignLeft().Text(text =>
@@ -193,11 +193,11 @@ public class RecapDocument : BaseDocument
                 });                // Table header
                 table.Header(header =>
                 {
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("OUT").Bold();
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("").Bold();
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("RETN").Bold();
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("USED").Bold();
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("OTHER").Bold();
+                    header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("OUT").Bold();
+                    header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("").Bold();
+                    header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("RETN").Bold();
+                    header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("USED").Bold();
+                    header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("OTHER").Bold();
                 });                // Group items by ItemName to calculate totals
                 var groupedItems = _recapItems.GroupBy(r => r.ItemName).ToList();
                 
@@ -253,23 +253,28 @@ public class RecapDocument : BaseDocument
                         longName = $"{item.ItemName?.Trim()} - {item.Description.Trim()}";
                     }
 
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(outQty);
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).PaddingLeft(5).Text(longName);
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(retnQty);
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(usedQty);
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(otherQty);
+                    table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(1).PaddingRight(5).Text(outQty);
+                    table.Cell().Border(0.25f).BorderColor(Colors.Black).PaddingVertical(2).PaddingLeft(5).Text(longName);
+                    table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(retnQty);
+                    table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(usedQty);
+                    table.Cell().Border(0.25f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(otherQty);
                 }
             });
         });
     }    private void ComposeFooter(IContainer container)
     {
-        container.AlignRight().Text(text =>
-        {
-            text.DefaultTextStyle(x => x.FontSize(8));
-            text.Span("Page ");
-            text.CurrentPageNumber();
-            text.Span(" of ");
-            text.TotalPages();
+        container.Column(column =>
+        {            column.Item().PaddingTop(20).AlignLeft().Text(text =>
+            {
+                text.DefaultTextStyle(x => x.FontSize(10));
+                text.Span("Upon return of the above Gear & Equipment, inspection was assigned to the following:");
+            });
+              column.Item().PaddingTop(15).AlignCenter().Column(col =>
+            {
+                col.Item().Text("Inspected by:").FontSize(10);
+                col.Item().PaddingTop(20).LineHorizontal(1).LineColor(Colors.Black);
+                col.Item().PaddingTop(5).Text(_inspectedBy).FontSize(10).AlignCenter();
+            });
         });
     }
 }
