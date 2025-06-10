@@ -27,7 +27,6 @@ public class LockerDbContext : DbContext
     public DbSet<TestClass> TestClasses { get; set; }
     public DbSet<TwoWeek> TwoWeeks { get; set; }
     public DbSet<Recap> Recaps { get; set; }
-    public DbSet<RptRecap> RptRecaps { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

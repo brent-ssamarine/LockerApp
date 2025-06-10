@@ -6,7 +6,7 @@ namespace AccessMigrationApp.Services;
 public interface IReportService
 {
     Task<byte[]> GenerateGearListPdf(int locationId, string locationName, string berth, int finished);
-    Task<byte[]> GenerateRecapPdf(DateTime startDate, DateTime endDate, string inspectedBy);
+    Task<byte[]> GenerateRecapPdf(DateTime startDate, DateTime endDate, string inspectedBy, int? locationId = null);
     // Task<byte[]> GenerateMaterialsListPdf(int locationId, string locationName, string berth, DateTime startDate, DateTime endDate);
     // Task<byte[]> GenerateJobListPdf(DateTime startDate, DateTime endDate, string? jobType = null);
     // Task<byte[]> GenerateRecapInspectedBySubPdf(DateTime startDate, DateTime endDate, string subInspector);
@@ -29,9 +29,9 @@ public class ReportService : IReportService
         return document.GeneratePdf();
     }
 
-    public async Task<byte[]> GenerateRecapPdf(DateTime startDate, DateTime endDate, string inspectedBy)
+    public async Task<byte[]> GenerateRecapPdf(DateTime startDate, DateTime endDate, string inspectedBy, int? locationId = null)
     {
-        var document = new RecapDocument(_serviceProvider, startDate, endDate, inspectedBy);
+        var document = new RecapDocument(_serviceProvider, startDate, endDate, inspectedBy, locationId);
         await document.PrepareAsync();
         return document.GeneratePdf();
     }

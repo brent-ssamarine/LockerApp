@@ -708,9 +708,8 @@ else
             
             // Use the inspectedBy field if available, otherwise empty string
             var inspector = string.IsNullOrEmpty(inspectedBy) ? "" : inspectedBy;
-            
-            Console.WriteLine($"Generating recap PDF from {startDate:MM/dd/yyyy} to {endDate:MM/dd/yyyy} for inspector: {inspector}");
-            var pdfBytes = await ReportService.GenerateRecapPdf(startDate, endDate, inspector);
+              Console.WriteLine($"Generating recap PDF from {startDate:MM/dd/yyyy} to {endDate:MM/dd/yyyy} for inspector: {inspector} at location: {LocationId}");
+            var pdfBytes = await ReportService.GenerateRecapPdf(startDate, endDate, inspector, LocationId);
             
             await ShowRecapPdf(pdfBytes);
         }

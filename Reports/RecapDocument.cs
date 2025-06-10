@@ -10,79 +10,123 @@ using QuestPDF.Infrastructure;
 namespace AccessMigrationApp.Reports;
 
 public class RecapDocument : BaseDocument
-{
-    private readonly DateTime _startDate;
-    private readonly DateTime _endDate;
+{    private readonly DateTime _startDate;
     private readonly string _inspectedBy;
+    private readonly int? _locationId;
+    private string _locationName = "";
+    private string _voyageNumber = "";
+    private string _berth = "";
+    private DateTime _displayStartDate; // Will be populated from location data or use _startDate as fallback
     private List<RecapViewModel>? _recapItems;
 
     public RecapDocument(
         IServiceProvider serviceProvider,
         DateTime startDate,
         DateTime endDate,
-        string inspectedBy) : base(serviceProvider)
+        string inspectedBy,
+        int? locationId = null) : base(serviceProvider)
     {
         _startDate = startDate;
-        _endDate = endDate;
         _inspectedBy = inspectedBy;
+        _locationId = locationId;
+        _displayStartDate = startDate; // Initialize with the provided start date as fallback
     }
 
     public async Task PrepareAsync()
     {
         await LoadData();
-    }
-
-    public override void Compose(IDocumentContainer container)
+    }    public override void Compose(IDocumentContainer container)
     {
         container
             .Page(page =>
             {
-                page.Margin(20);
+                page.Size(PageSizes.Letter);
+                page.Margin(1, Unit.Centimetre);
+                page.DefaultTextStyle(x => x
+                    .FontSize(8)
+                    .FontFamily("Arial"));
+
                 page.Header().Element(ComposeHeader);
                 page.Content().Element(ComposeContent);
                 page.Footer().Element(ComposeFooter);
             });
-    }
-
-    private void ComposeHeader(IContainer container)
+    }private void ComposeHeader(IContainer container)
     {
-        container.Row(row =>
+        container.Column(column =>
         {
-            row.RelativeItem().Column(column =>
+            // First header line - Company info and date/page
+            column.Item().Row(row =>
             {
-                column.Item().Text("Inventory Transfer Recap Report")
-                    .Style(TitleStyle);
-
-                column.Item().Text($"Period: {_startDate:MM/dd/yyyy} - {_endDate:MM/dd/yyyy}")
-                    .Style(SubtitleStyle);
-
-                if (!string.IsNullOrEmpty(_inspectedBy))
+                row.RelativeItem().Text("SSA Marine Canada").FontSize(8);
+                row.RelativeItem().AlignRight().Text(text =>
                 {
-                    column.Item().Text($"Inspected By: {_inspectedBy}")
-                        .Style(SubtitleStyle);
-                }
+                    text.DefaultTextStyle(x => x.FontSize(8));
+                    text.Span($"{DateTime.Now:dd-MMM-yy h:mm tt}");
+                    text.Span("  Page ");
+                    text.CurrentPageNumber();
+                    text.Span(" of ");
+                    text.TotalPages();
+                });
             });
 
-            row.RelativeItem().Column(column =>
+            // Second header line
+            column.Item().Text("locker:recap").FontSize(8);            // Title section with vessel, berth, and starting date
+            column.Item().PaddingVertical(5).Row(row =>
             {
-                column.Item().Text($"Generated: {DateTime.Now:MM/dd/yyyy HH:mm}")
-                    .Style(DefaultTextStyle)
-                    .AlignRight();
+                row.RelativeItem(2).Column(c =>
+                {
+                    c.Item().Text(text =>
+                    {
+                        text.Span("For the  ").FontSize(10);
+                        text.Span(_locationName).Bold().FontSize(10);
+                    });
+                    c.Item().Text(_voyageNumber).FontSize(10);
+                });
+
+                row.RelativeItem().AlignCenter().Text(text =>
+                {
+                    text.Span("Berth  ").FontSize(10);
+                    text.Span(_berth).Bold().FontSize(10);
+                });                row.RelativeItem().AlignRight().Text(text =>
+                {
+                    text.Span("Starting  ").FontSize(10);
+                    text.Span(_displayStartDate.ToString("MM/dd/yyyy")).Bold().FontSize(10);
+                });
             });
         });
-    }
-
-    private async Task LoadData()
+    }    private async Task LoadData()
     {
-        if (_recapItems != null) return;        using var scope = ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+        if (_recapItems != null) return; 
 
-        var query = dbContext.Recaps
-            .Where(r => r.TransferDate >= _startDate && r.TransferDate <= _endDate);
-        if (!string.IsNullOrEmpty(_inspectedBy))
+        using var scope = ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();        // First, load location information if locationId is provided
+        if (_locationId.HasValue)
         {
-            query = query.Where(r => r.InspectedBy == _inspectedBy);
-        }        _recapItems = await query
+            var location = await dbContext.Locations
+                .FirstOrDefaultAsync(l => l.Id == _locationId.Value);
+
+            if (location != null)
+            {
+                _locationName = location.Name ?? "ARKIS OCEAN";
+                _voyageNumber = location.VoyageNumber ?? "99-177";
+                _berth = location.Berth ?? "FRAS-4";
+                
+                // Use the location's StartDate if available, otherwise use the provided _startDate
+                if (location.StartDate.HasValue)
+                {
+                    _displayStartDate = location.StartDate.Value;
+                }
+            }
+        }
+
+        IQueryable<Recap> query = dbContext.Recaps;
+
+        if (_locationId.HasValue)
+        {
+            query = dbContext.Recaps.Where(r => r.Location == _locationId.Value);
+        }
+
+        _recapItems = await query
             .Select(r => new RecapViewModel
             {
                 InvLocId = r.invlocId,
@@ -100,120 +144,108 @@ public class RecapDocument : BaseDocument
             .OrderBy(r => r.TransferDate)
             .ThenBy(r => r.Location)
             .ThenBy(r => r.ItemName)
-            .ToListAsync();
-    }
+            .ToListAsync();        // If no specific locationId was provided, try to get location info from the first recap item
+        if (!_locationId.HasValue && _recapItems?.Any() == true)
+        {
+            int? targetLocationId = _recapItems.FirstOrDefault()?.Location;
+            
+            if (targetLocationId.HasValue)
+            {
+                var location = await dbContext.Locations
+                    .FirstOrDefaultAsync(l => l.Id == targetLocationId.Value);
 
+                if (location != null)
+                {
+                    _locationName = location.Name ?? "";
+                    _voyageNumber = location.VoyageNumber ?? "";
+                    _berth = location.Berth ?? "";
+                    
+                    // Use the location's StartDate if available
+                    if (location.StartDate.HasValue)
+                    {
+                        _displayStartDate = location.StartDate.Value;
+                    }
+                }
+            }
+        }
+    }
     private void ComposeContent(IContainer container)
     {
         LoadData().Wait();
 
-        container.PaddingVertical(10).Column(column =>
+        if (_recapItems == null || !_recapItems.Any())
         {
-            // Table header
-            column.Item().Row(row =>
-            {
-                row.RelativeItem(2).Text("Date").Style(HeaderStyle);
-                row.RelativeItem(1).Text("Location").Style(HeaderStyle);
-                row.RelativeItem(3).Text("Item").Style(HeaderStyle);
-                row.RelativeItem(2).Text("Description").Style(HeaderStyle);
-                row.RelativeItem(1).Text("Quantity").Style(HeaderStyle).AlignRight();
-                row.RelativeItem(1).Text("On Hand").Style(HeaderStyle).AlignRight();
-                row.RelativeItem(2).Text("Inspector").Style(HeaderStyle);
-            });
+            container.Text("No items found.");
+            return;
+        }
 
-            // Table content
-            if (_recapItems != null && _recapItems.Any())
-            {                DateTime? currentDate = null;
+        container.Column(column =>
+        {
+            // Main table
+            column.Item().Table(table =>
+            {
+                // Define columns similar to the sample image
+                table.ColumnsDefinition(columns =>
+                {
+                    columns.ConstantColumn(40);    // OUT
+                    columns.RelativeColumn(4);     // Item Description
+                    columns.ConstantColumn(40);    // RETN
+                    columns.ConstantColumn(40);    // USED
+                    columns.ConstantColumn(50);    // OTHER
+                });
+
+                // Table header
+                table.Header(header =>
+                {
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("OUT").Bold().FontSize(8);
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("").Bold().FontSize(8);
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("RETN").Bold().FontSize(8);
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("USED").Bold().FontSize(8);
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("OTHER").Bold().FontSize(8);
+                });
+
+                // Table rows
                 foreach (var item in _recapItems)
                 {
-                    // Add date separator if it's a new date
-                    if (item.TransferDate?.Date != currentDate?.Date)
+                    // Determine which column to show quantity based on Consumed status
+                    var outQty = "";
+                    var retnQty = "";
+                    var usedQty = "";
+                    var otherQty = "";
+
+                    if (item.Consumed == 0) // Not consumed - show in RETN
                     {
-                        column.Item().PaddingTop(10).BorderBottom(1).BorderColor(Colors.Grey.Medium).Row(row =>
-                        {
-                            row.RelativeItem().Text(item.FormattedTransferDate).Style(HeaderStyle);
-                        });
-                        currentDate = item.TransferDate;
-                    }                    column.Item().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(2).Row(row =>
+                        retnQty = item.Quantity?.ToString("0") ?? "";
+                    }
+                    else if (item.Consumed == 1) // Consumed - show in USED
                     {
-                        row.RelativeItem(2).Text(item.FormattedTransferDate).Style(DefaultTextStyle);
-                        row.RelativeItem(1).Text(item.Location?.ToString() ?? "").Style(DefaultTextStyle);
-                        row.RelativeItem(3).Text(item.ItemName ?? "").Style(DefaultTextStyle);
-                        row.RelativeItem(2).Text(item.Description ?? "").Style(DefaultTextStyle);
-                        row.RelativeItem(1).AlignRight().Text(item.FormattedQuantity).Style(DefaultTextStyle);
-                        row.RelativeItem(1).AlignRight().Text(item.FormattedOnHand).Style(DefaultTextStyle);
-                        row.RelativeItem(2).Text(item.InspectedBy ?? "").Style(DefaultTextStyle);
-                    });
+                        usedQty = item.Quantity?.ToString("0") ?? "";
+                    }
+                    else // Other status
+                    {
+                        otherQty = item.Quantity?.ToString("0") ?? "";
+                    }
+
+                    // Show initial quantity in OUT column
+                    outQty = item.OnHand?.ToString("0") ?? "";
+
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(outQty).FontSize(8);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).PaddingLeft(5).Text($"{item.ItemName} - {item.Description}").FontSize(8);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(retnQty).FontSize(8);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(usedQty).FontSize(8);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(otherQty).FontSize(8);
                 }
-            }
-            else
-            {
-                column.Item().PaddingTop(20).Text("No records found for the specified criteria.")
-                    .Style(DefaultTextStyle);
-            }
-
-            // Summary section
-            if (_recapItems != null && _recapItems.Any())
-            {
-                column.Item().PaddingTop(20).Row(row =>
-                {
-                    row.RelativeItem().Column(c =>                    {
-                        c.Item().Text("Summary by Location").Style(HeaderStyle);
-                          var locationSummary = _recapItems
-                            .GroupBy(r => r.Location)
-                            .Select(g => new { Location = g.Key?.ToString() ?? "Unknown", Count = g.Count() })
-                            .OrderBy(s => s.Location);
-
-                        foreach (var item in locationSummary)
-                        {
-                            c.Item().Text($"Location {item.Location}: {item.Count} transfers").Style(DefaultTextStyle);
-                        }
-                    });
-
-                    row.RelativeItem().Column(c =>
-                    {
-                        c.Item().Text("Summary by Inspector").Style(HeaderStyle);
-                        
-                        var inspectorSummary = _recapItems
-                            .GroupBy(r => r.InspectedBy)
-                            .Select(g => new { Inspector = g.Key ?? "Unknown", Count = g.Count() })
-                            .OrderBy(s => s.Inspector);
-
-                        foreach (var item in inspectorSummary)
-                        {
-                            c.Item().Text($"{item.Inspector}: {item.Count} transfers").Style(DefaultTextStyle);
-                        }                    });
-                });
-
-                // Total quantity summary
-                column.Item().PaddingTop(10).Row(row =>
-                {
-                    row.RelativeItem().Column(c =>
-                    {
-                        var totalQuantity = _recapItems.Sum(r => r.Quantity ?? 0);
-                        c.Item().Text($"Total Quantity Transferred: {totalQuantity:N2}").Style(HeaderStyle);
-                    });
-                });
-            }
+            });
         });
-    }
-
-    private void ComposeFooter(IContainer container)
+    }    private void ComposeFooter(IContainer container)
     {
-        container.Row(row =>
+        container.AlignRight().Text(text =>
         {
-            row.RelativeItem().Text(text =>
-            {
-                text.Span("Page ").Style(DefaultTextStyle);
-                text.CurrentPageNumber().Style(DefaultTextStyle);
-                text.Span(" of ").Style(DefaultTextStyle);
-                text.TotalPages().Style(DefaultTextStyle);
-            });
-
-            row.RelativeItem().AlignRight().Text(text =>
-            {
-                text.Span($"Total Records: {_recapItems?.Count ?? 0}").Style(DefaultTextStyle);
-            });
+            text.DefaultTextStyle(x => x.FontSize(8));
+            text.Span("Page ");
+            text.CurrentPageNumber();
+            text.Span(" of ");
+            text.TotalPages();
         });
     }
 }

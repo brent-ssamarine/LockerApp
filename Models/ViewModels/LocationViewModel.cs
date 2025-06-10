@@ -10,6 +10,7 @@ public class LocationViewModel
     public string? Superintendent { get; set; }
     public string? Foreman { get; set; }
     public string? Standby { get; set; }
+    public string? VoyageNumber { get; set; }
     public string? Phone { get; set; }
     public string? Note { get; set; }
     public DateTime? StartDate { get; set; }
