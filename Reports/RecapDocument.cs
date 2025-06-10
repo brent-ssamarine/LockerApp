@@ -43,7 +43,7 @@ public class RecapDocument : BaseDocument
                 page.Size(PageSizes.Letter);
                 page.Margin(1, Unit.Centimetre);
                 page.DefaultTextStyle(x => x
-                    .FontSize(8)
+                    .FontSize(10)
                     .FontFamily("Arial"));
 
                 page.Header().Element(ComposeHeader);
@@ -53,16 +53,16 @@ public class RecapDocument : BaseDocument
     }private void ComposeHeader(IContainer container)
     {
         container.Column(column =>
-        {
-            // First header line - Company info and date/page
+        {            // First header line - Company info and date/page
             column.Item().Row(row =>
             {
                 row.RelativeItem().Text("SSA Marine Canada").FontSize(8);
                 row.RelativeItem().AlignRight().Text(text =>
                 {
                     text.DefaultTextStyle(x => x.FontSize(8));
-                    text.Span($"{DateTime.Now:dd-MMM-yy h:mm tt}");
-                    text.Span("  Page ");
+                    text.Span($"{DateTime.Now:MM/dd/yy h:mm tt}");
+                    text.Line("");
+                    text.Span("Page ");
                     text.CurrentPageNumber();
                     text.Span(" of ");
                     text.TotalPages();
@@ -70,7 +70,7 @@ public class RecapDocument : BaseDocument
             });
 
             // Second header line
-            column.Item().Text("locker:recap").FontSize(8);            // Title section with vessel, berth, and starting date
+            column.Item().Text("locker:recap").FontSize(8);// Title section with vessel, berth, and starting date
             column.Item().PaddingVertical(5).Row(row =>
             {
                 row.RelativeItem(2).Column(c =>
@@ -87,7 +87,8 @@ public class RecapDocument : BaseDocument
                 {
                     text.Span("Berth  ").FontSize(10);
                     text.Span(_berth).Bold().FontSize(10);
-                });                row.RelativeItem().AlignRight().Text(text =>
+                });
+                row.RelativeItem().AlignRight().Text(text =>
                 {
                     text.Span("Starting  ").FontSize(10);
                     text.Span(_displayStartDate.ToString("MM/dd/yyyy")).Bold().FontSize(10);
@@ -107,9 +108,9 @@ public class RecapDocument : BaseDocument
 
             if (location != null)
             {
-                _locationName = location.Name ?? "ARKIS OCEAN";
-                _voyageNumber = location.VoyageNumber ?? "99-177";
-                _berth = location.Berth ?? "FRAS-4";
+                _locationName = location.Name ?? "";
+                _voyageNumber = location.VoyageNumber ?? "";
+                _berth = location.Berth ?? "";
                 
                 // Use the location's StartDate if available, otherwise use the provided _startDate
                 if (location.StartDate.HasValue)
@@ -139,12 +140,9 @@ public class RecapDocument : BaseDocument
                 TransferDate = r.TransferDate,
                 Quantity = r.Quantity ?? 0,
                 Consumed = r.Consumed,
-                InspectedBy = r.InspectedBy ?? ""
-            })
-            .OrderBy(r => r.TransferDate)
-            .ThenBy(r => r.Location)
-            .ThenBy(r => r.ItemName)
-            .ToListAsync();        // If no specific locationId was provided, try to get location info from the first recap item
+                InspectedBy = r.InspectedBy ?? ""            })
+            .OrderBy(r => r.ItemName)
+            .ToListAsync();// If no specific locationId was provided, try to get location info from the first recap item
         if (!_locationId.HasValue && _recapItems?.Any() == true)
         {
             int? targetLocationId = _recapItems.FirstOrDefault()?.Location;
@@ -192,48 +190,74 @@ public class RecapDocument : BaseDocument
                     columns.ConstantColumn(40);    // RETN
                     columns.ConstantColumn(40);    // USED
                     columns.ConstantColumn(50);    // OTHER
-                });
-
-                // Table header
+                });                // Table header
                 table.Header(header =>
                 {
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("OUT").Bold().FontSize(8);
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("").Bold().FontSize(8);
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("RETN").Bold().FontSize(8);
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("USED").Bold().FontSize(8);
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("OTHER").Bold().FontSize(8);
-                });
-
-                // Table rows
-                foreach (var item in _recapItems)
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("OUT").Bold();
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("").Bold();
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("RETN").Bold();
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("USED").Bold();
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().Text("OTHER").Bold();
+                });                // Group items by ItemName to calculate totals
+                var groupedItems = _recapItems.GroupBy(r => r.ItemName).ToList();
+                
+                foreach (var group in groupedItems)
                 {
-                    // Determine which column to show quantity based on Consumed status
-                    var outQty = "";
-                    var retnQty = "";
-                    var usedQty = "";
-                    var otherQty = "";
-
-                    if (item.Consumed == 0) // Not consumed - show in RETN
+                    var item = group.First(); // Get first item for display info
+                    var totalQuantity = group.Sum(g => g.Quantity ?? 0);
+                    
+                    // Initialize totals
+                    double usedTotal = 0;
+                    double returnedTotal = 0;
+                    double otherTotal = 0;
+                    
+                    // Apply VBA logic for each item in the group
+                    foreach (var recapItem in group)
                     {
-                        retnQty = item.Quantity?.ToString("0") ?? "";
-                    }
-                    else if (item.Consumed == 1) // Consumed - show in USED
+                        var quantity = recapItem.Quantity ?? 0;
+                        
+                        if (recapItem.Consumed == 1)
+                        {
+                            // If consumed = 1, add to used
+                            usedTotal += quantity;
+                        }
+                        else
+                        {
+                            // If not consumed, check location type
+                            if (recapItem.LocationType == "YARD")
+                            {
+                                // If location type is YARD, add to returned
+                                returnedTotal += quantity;
+                            }
+                            else
+                            {
+                                // Otherwise, add to other
+                                otherTotal += quantity;
+                            }
+                        }                    }
+
+                    // Display quantities in appropriate columns
+                    var outQty = totalQuantity > 0 ? totalQuantity.ToString("0") : "";
+                    var retnQty = returnedTotal > 0 ? returnedTotal.ToString("0") : "";
+                    var usedQty = usedTotal > 0 ? usedTotal.ToString("0") : "";
+                    var otherQty = otherTotal > 0 ? otherTotal.ToString("0") : "";
+
+                    // Apply VBA logic for item name and description
+                    string longName;
+                    if (string.IsNullOrWhiteSpace(item.Description))
                     {
-                        usedQty = item.Quantity?.ToString("0") ?? "";
+                        longName = item.ItemName?.Trim() ?? "";
                     }
-                    else // Other status
+                    else
                     {
-                        otherQty = item.Quantity?.ToString("0") ?? "";
+                        longName = $"{item.ItemName?.Trim()} - {item.Description.Trim()}";
                     }
 
-                    // Show initial quantity in OUT column
-                    outQty = item.OnHand?.ToString("0") ?? "";
-
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(outQty).FontSize(8);
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).PaddingLeft(5).Text($"{item.ItemName} - {item.Description}").FontSize(8);
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(retnQty).FontSize(8);
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(usedQty).FontSize(8);
-                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(otherQty).FontSize(8);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(outQty);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).PaddingLeft(5).Text(longName);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(retnQty);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(usedQty);
+                    table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingRight(5).Text(otherQty);
                 }
             });
         });

@@ -63,7 +63,8 @@ namespace AccessMigrationApp.Models.ViewModels
                 ItemName = ItemName,
                 OnHand = OnHand,
                 Description = Description,
-                LocationType = LocationType,                TransferDate = TransferDate,
+                LocationType = LocationType,
+                TransferDate = TransferDate,
                 Quantity = Quantity,
                 Consumed = (short)Consumed,
                 InspectedBy = InspectedBy

@@ -36,7 +36,7 @@ else
             <label class="form-label">Search</label>
             <div class="input-group">
                 <input type="text" class="form-control" placeholder="Search locations..." 
-                       @bind="searchTerm" @bind:event="oninput" @onkeyup="FilterLocations" />
+                       @bind="searchTerm" @bind:event="oninput" @onkeyup="async () => await FilterLocations()" />
                 <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">
                     <span class="oi oi-x"></span>
                 </button>
@@ -45,85 +45,99 @@ else
     </div>
 
     <div class="table-responsive">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Location"))">
-                        Location
-                        <span class="oi @(GetSortIcon("Location"))"></span>
-                        <small class="text-muted ms-1">(@_filteredLocations?.FirstOrDefault()?.Id)</small>
-                    </th>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Starts"))">
-                        Starts
-                        <span class="oi @(GetSortIcon("Starts"))"></span>
-                    </th>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Berth"))">
-                        Berth
-                        <span class="oi @(GetSortIcon("Berth"))"></span>
-                    </th>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Gear"))">
-                        Gear
-                        <span class="oi @(GetSortIcon("Gear"))"></span>
-                    </th>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Cargo"))">
-                        Cargo
-                        <span class="oi @(GetSortIcon("Cargo"))"></span>
-                    </th>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Supt"))">
-                        Supt
-                        <span class="oi @(GetSortIcon("Supt"))"></span>
-                    </th>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Foreman"))">
-                        Foreman
-                        <span class="oi @(GetSortIcon("Foreman"))"></span>
-                    </th>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Standby"))">
-                        Standby
-                        <span class="oi @(GetSortIcon("Standby"))"></span>
-                    </th>
-                    <th style="cursor: pointer" @onclick="@(() => SortBy("Phone"))">
-                        Phone
-                        <span class="oi @(GetSortIcon("Phone"))"></span>
-                    </th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var location in _filteredLocations ?? Enumerable.Empty<Location>())
-                {
+        @if (isFiltering)
+        {
+            <div class="text-center p-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="mt-2">
+                    <em>Filtering locations...</em>
+                </div>
+            </div>
+        }
+        else
+        {
+            <table class="table table-striped">
+                <thead>
                     <tr>
-                        <td class="location-cell text-primary" @onclick="() => ViewInventory(location)" title="Click location #@location.Id to see Gear/Equipment List">@location.Name</td>
-                        <td>@(location.StartDate?.ToShortDateString() ?? "")</td>
-                        <td>
-                            @if (!string.IsNullOrEmpty(location.Berth))
-                            {
-                                <a href="/berths/@Uri.EscapeDataString(location.Berth)" target="_blank" class="text-primary" style="text-decoration: none;" title="Click the Berth to open Berth Management">
-                                    @location.Berth
-                                </a>
-                            }
-                            else
-                            {
-                                @location.Berth
-                            }
-                        </td>
-                        <td>@location.Gear</td>
-                        <td>@location.Cargo</td>
-                        <td>@location.Superintendent</td>
-                        <td>@location.Foreman</td>
-                        <td>@location.Standby</td>
-                        <td>@location.Phone</td>
-                        <td>
-                            <button class="btn btn-primary btn-sm" @onclick="() => EditLocation(location)">
-                                <span class="oi oi-pencil"></span>
-                            </button>
-                            <button class="btn btn-info btn-sm ms-1" @onclick="() => ViewInventory(location)">
-                                <span class="oi oi-list"></span>
-                            </button>
-                        </td>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Location"))">
+                            Location
+                            <span class="oi @(GetSortIcon("Location"))"></span>
+                            <small class="text-muted ms-1">(@_filteredLocations?.FirstOrDefault()?.Id)</small>
+                        </th>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Starts"))">
+                            Starts
+                            <span class="oi @(GetSortIcon("Starts"))"></span>
+                        </th>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Berth"))">
+                            Berth
+                            <span class="oi @(GetSortIcon("Berth"))"></span>
+                        </th>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Gear"))">
+                            Gear
+                            <span class="oi @(GetSortIcon("Gear"))"></span>
+                        </th>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Cargo"))">
+                            Cargo
+                            <span class="oi @(GetSortIcon("Cargo"))"></span>
+                        </th>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Supt"))">
+                            Supt
+                            <span class="oi @(GetSortIcon("Supt"))"></span>
+                        </th>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Foreman"))">
+                            Foreman
+                            <span class="oi @(GetSortIcon("Foreman"))"></span>
+                        </th>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Standby"))">
+                            Standby
+                            <span class="oi @(GetSortIcon("Standby"))"></span>
+                        </th>
+                        <th style="cursor: pointer" @onclick="@(() => SortBy("Phone"))">
+                            Phone
+                            <span class="oi @(GetSortIcon("Phone"))"></span>
+                        </th>
+                        <th>Actions</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var location in _filteredLocations ?? Enumerable.Empty<Location>())
+                    {
+                        <tr>
+                            <td class="location-cell text-primary" @onclick="() => ViewInventory(location)" title="Click location #@location.Id to see Gear/Equipment List">@location.Name</td>
+                            <td>@(location.StartDate?.ToShortDateString() ?? "")</td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(location.Berth))
+                                {
+                                    <a href="/berths/@Uri.EscapeDataString(location.Berth)" target="_blank" class="text-primary" style="text-decoration: none;" title="Click the Berth to open Berth Management">
+                                        @location.Berth
+                                    </a>
+                                }
+                                else
+                                {
+                                    @location.Berth
+                                }
+                            </td>
+                            <td>@location.Gear</td>
+                            <td>@location.Cargo</td>
+                            <td>@location.Superintendent</td>
+                            <td>@location.Foreman</td>
+                            <td>@location.Standby</td>
+                            <td>@location.Phone</td>
+                            <td>
+                                <button class="btn btn-primary btn-sm" @onclick="() => EditLocation(location)">
+                                    <span class="oi oi-pencil"></span>
+                                </button>
+                                <button class="btn btn-info btn-sm ms-1" @onclick="() => ViewInventory(location)">
+                                    <span class="oi oi-list"></span>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
     </div>
     <div class="instruction-text">
         Click a location to see Gear / Equipment List
@@ -260,6 +274,7 @@ else
     private string currentSortColumn = "Location";
     private bool isAscending = true;
     private string? secondarySortColumn;
+    private bool isFiltering = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -281,7 +296,7 @@ else
         _locationTypes = await LockerDbContext.LocationTypes.ToListAsync();
         _berths = await LockerDbContext.Berths.Where(b => !b.IsArchived).OrderBy(b => b.Name).ToListAsync();
 
-        FilterLocations();
+        await FilterLocations();
         }
         catch (Exception ex)
         {
@@ -289,9 +304,16 @@ else
         }
     }
 
-    private void FilterLocations()
+    private async Task FilterLocations()
     {
         if (_locations == null) return;
+
+        // Show loading state
+        isFiltering = true;
+        StateHasChanged();
+
+        // Allow UI to update by yielding control
+        await Task.Delay(1);
 
         var query = _locations.AsEnumerable();
 
@@ -346,6 +368,9 @@ else
         query = ApplySort(query);
 
         _filteredLocations = query.ToList();
+        
+        // Hide loading state
+        isFiltering = false;
         StateHasChanged();
     }
 
@@ -413,7 +438,7 @@ else
         return ascending ? query.OrderBy(sortSelector) : query.OrderByDescending(sortSelector);
     }
 
-    private void SortBy(string columnName)
+    private async Task SortBy(string columnName)
     {
         if (currentSortColumn == columnName)
         {
@@ -427,7 +452,7 @@ else
             isAscending = true;
         }
 
-        FilterLocations();
+        await FilterLocations();
     }
 
     private string GetSortIcon(string columnName)
@@ -438,16 +463,16 @@ else
         return isAscending ? "oi-caret-top" : "oi-caret-bottom";
     }
 
-    private void OnCategoryChanged(ChangeEventArgs e)
+    private async Task OnCategoryChanged(ChangeEventArgs e)
     {
         selectedCategory = e.Value?.ToString() ?? "VESSELS";
-        FilterLocations();
+        await FilterLocations();
     }
 
-    private void ClearSearch()
+    private async Task ClearSearch()
     {
         searchTerm = "";
-        FilterLocations();
+        await FilterLocations();
     }
 
     private void ShowAddLocationModal()

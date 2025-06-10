@@ -163,6 +163,8 @@
     
     private string Note { get; set; } = "";
     private double TransferQuantity { get; set; }
+    private double CostPer { get; set; }
+    private string? PONumber { get; set; }
     private string? ToLocation { get; set; }
     private string? TakenFrom { get; set; }
     private DateTime AsOfDate { get; set; } = DateTime.Today;
@@ -440,8 +442,8 @@
                 "MOVE", // Job
                 TakenFrom,
                 AsOfDate,
-                null, // PONumber
-                0, // CostPer
+                PONumber, // PONumber
+                CostPer, // CostPer
                 0, // LockerTotal
                 0, // InventoryTotal
                 InspectedBy

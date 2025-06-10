@@ -515,7 +515,9 @@ public class InvTran
     public string? TakenFrom { get; set; }
     
     [Column("transfer_date")]
-    public DateTime? TransferDate { get; set; }    [Column("quantity")]
+    public DateTime? TransferDate { get; set; }
+
+    [Column("quantity")]
     public double? Quantity { get; set; }
     
     [Column("costper")]
