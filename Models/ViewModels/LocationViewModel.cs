@@ -2,8 +2,9 @@ namespace AccessMigrationApp.Models.ViewModels;
 
 public class LocationViewModel
 {
-    public int LocationId { get; set; }
+    public int Id { get; set; }
     public string Name { get; set; } = "";
+    public string LocationType { get; set; } = "";
     public string Berth { get; set; } = "";
     public string? Gear { get; set; }
     public string? Cargo { get; set; }

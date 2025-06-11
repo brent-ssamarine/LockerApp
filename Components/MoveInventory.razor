@@ -57,7 +57,7 @@
                                 {
                                     @foreach (var loc in locations)
                                     {
-                                        <option value="@loc.LocationId">@loc.LocationId.ToString().PadRight(5, '\u00A0')│ @loc.Name</option>
+                                        <option value="@loc.Id">@loc.Id.ToString().PadRight(5, '\u00A0')│ @loc.Name</option>
                                     }
                                 }
                             </select>
@@ -230,7 +230,7 @@
                 .OrderBy(l => l.Name)
                 .Select(l => new LocationViewModel 
                 { 
-                    LocationId = l.Id,
+                    Id = l.Id,
                     Name = l.Name ?? ""
                 })
                 .ToListAsync();

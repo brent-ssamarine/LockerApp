@@ -143,20 +143,17 @@ else
                     {
                         <option value="@LocationId">@LocationId.Value.ToString().PadRight(5, '\u00A0')│ @(LocationName ?? "")</option>
                     }
-                    @if (allLocations != null)
+                    @if (targetLocations != null)
                     {
-                        @foreach (var loc in allLocations)
+                        @foreach (var loc in targetLocations)
                         {
-                            <option value="@loc.LocationId">@loc.LocationId.ToString().PadRight(5, '\u00A0')│ @loc.Name</option>
+                            <option value="@loc.Id">@loc.Id.ToString().PadRight(5, '\u00A0')│ @loc.Name</option>
                         }
                     }
                 </select>
-            </div>
+            </div>            
             <div class="col-auto">
                 <button class="btn btn-primary" @onclick="PrintInventoryList" disabled="@(!CanPrint)">Print Gear List</button>
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-primary" @onclick="PrintMaterials" disabled="@(!CanPrint)">Print Materials</button>
             </div>
             <div class="col-auto">
                 <label>Transfer Remaining inventory</label>
@@ -230,11 +227,11 @@ else
                Description="@(selectedItem?.Description ?? string.Empty)"
                OnMoveCompleted="OnMoveCompleted" />
 
-<InventoryTransferDetails Show="@showDetailsDialog"
-                         ShowChanged="@((bool value) => showDetailsDialog = value)"
-                         InvlocId="@(selectedItem?.InvlocId ?? 0)"
-                         ItemId="@(selectedItem?.ItemId ?? string.Empty)"
-                         ItemName="@(selectedItem?.ItemName ?? string.Empty)" />
+<InventoryTransfer Show="@showDetailsDialog"
+                    ShowChanged="@((bool value) => showDetailsDialog = value)"
+                    InvlocId="@(selectedItem?.InvlocId ?? 0)"
+                    ItemId="@(selectedItem?.ItemId ?? string.Empty)"
+                    ItemName="@(selectedItem?.ItemName ?? string.Empty)" />
 
 <style>
     .instructions {
@@ -392,7 +389,7 @@ else
     private int currentPage = 1;
     private int pageSize = 10;
     private int totalPages => inventoryItems == null ? 0 : (int)Math.Ceiling(inventoryItems.Count / (double)pageSize);
-    private List<LocationViewModel>? allLocations;
+    private List<LocationViewModel>? targetLocations;
     private List<Location>? transferLocations;
     private List<LocationType>? locationTypes;
     private string? selectedPrintLocation;
@@ -435,7 +432,7 @@ else
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
 
-            allLocations = await dbContext.Locations
+            targetLocations = await dbContext.Locations
                 .Where(l => 
                     l.Finished != 1 &&               // finished = False
                     l.LocationType != "SUPPLIER" &&  // loc_type <> "SUPPLIER"
@@ -443,7 +440,7 @@ else
                 .OrderBy(l => l.Id)                  // ORDER BY loc_id
                 .Select(l => new LocationViewModel 
                 { 
-                    LocationId = l.Id,             // loc_id
+                    Id = l.Id,             // loc_id
                     Name = l.Name ?? "",           // name
                     Berth = l.Berth ?? ""
                 })
@@ -613,7 +610,7 @@ else
 
         try
         {
-            var selectedLocation = allLocations?.FirstOrDefault(l => l.LocationId == locationId);
+            var selectedLocation = targetLocations?.FirstOrDefault(l => l.Id == locationId);
             if (selectedLocation == null)
             {
                 Console.WriteLine($"Location not found: {locationId}");
@@ -733,7 +730,7 @@ else
                 return;
             }
 
-            var selectedLocation = allLocations?.FirstOrDefault(l => l.LocationId == LocationId);
+            var selectedLocation = targetLocations?.FirstOrDefault(l => l.Id == LocationId);
             if (selectedLocation == null)
             {
                 Console.WriteLine($"Current location not found: {LocationId}");
