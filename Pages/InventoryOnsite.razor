@@ -434,7 +434,7 @@ else
 
             targetLocations = await dbContext.Locations
                 .Where(l => 
-                    l.Id != LocationId.Value &&  // loc_id <> current location
+                    //l.Id != LocationId.Value &&  // loc_id <> current location
                     l.Finished != 1 &&               // finished = False
                     l.LocationType != "SUPPLIER" &&  // loc_type <> "SUPPLIER"
                     l.LocationType != null) 
@@ -538,11 +538,9 @@ else
             if (LocationId.HasValue)
             {
                 query = query.Where(i => i.LocationId == LocationId.Value);
-            }
-
+            }            
             var items = await query.OrderBy(i => i.ItemName).ToListAsync();
             inventoryItems = items;
-            UpdateDisplayedItems();
             UpdateDisplayedItems();
         }
         catch (Exception ex)
