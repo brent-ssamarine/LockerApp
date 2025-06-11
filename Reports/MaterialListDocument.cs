@@ -164,7 +164,7 @@ public class MaterialListDocument : BaseDocument
                 // Table header
                 table.Header(header =>
                 {
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("ITEM NAME").Bold();
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("ITEM DESCRIPTION").Bold();
                     header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("QTY").Bold();
                     header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("TYPE").Bold();
                 });                // Table content - show individual records without grouping

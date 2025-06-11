@@ -10,13 +10,15 @@ using QuestPDF.Infrastructure;
 namespace AccessMigrationApp.Reports;
 
 public class RecapDocument : BaseDocument
-{    private readonly DateTime _startDate;
+{
+    private readonly DateTime _startDate;
+    private readonly DateTime _endDate;
     private readonly string _inspectedBy;
     private readonly int? _locationId;
     private string _locationName = "";
     private string _voyageNumber = "";
     private string _berth = "";
-    private DateTime _displayStartDate; // Will be populated from location data or use _startDate as fallback
+    private DateTime _displayStartDate = DateTime.Today;
     private List<RecapViewModel>? _recapItems;
 
     public RecapDocument(
@@ -27,9 +29,9 @@ public class RecapDocument : BaseDocument
         int? locationId = null) : base(serviceProvider)
     {
         _startDate = startDate;
+        _endDate = endDate;
         _inspectedBy = inspectedBy;
         _locationId = locationId;
-        _displayStartDate = startDate; // Initialize with the provided start date as fallback
     }
 
     public async Task PrepareAsync()
@@ -100,7 +102,7 @@ public class RecapDocument : BaseDocument
         if (_recapItems != null) return; 
 
         using var scope = ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();        // First, load location information if locationId is provided
+        var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();        // Load header information from Location model based on locationId
         if (_locationId.HasValue)
         {
             var location = await dbContext.Locations
@@ -111,20 +113,16 @@ public class RecapDocument : BaseDocument
                 _locationName = location.Name ?? "";
                 _voyageNumber = location.VoyageNumber ?? "";
                 _berth = location.Berth ?? "";
-                
-                // Use the location's StartDate if available, otherwise use the provided _startDate
-                if (location.StartDate.HasValue)
-                {
-                    _displayStartDate = location.StartDate.Value;
-                }
+                _displayStartDate = location.StartDate ?? _startDate;
             }
         }
 
+        // Load recap data
         IQueryable<Recap> query = dbContext.Recaps;
 
         if (_locationId.HasValue)
         {
-            query = dbContext.Recaps.Where(r => r.Location == _locationId.Value);
+            query = query.Where(r => r.Location == _locationId.Value);
         }
 
         _recapItems = await query
@@ -140,32 +138,10 @@ public class RecapDocument : BaseDocument
                 TransferDate = r.TransferDate,
                 Quantity = r.Quantity ?? 0,
                 Consumed = r.Consumed,
-                InspectedBy = r.InspectedBy ?? ""            })
+                InspectedBy = r.InspectedBy ?? ""
+            })
             .OrderBy(r => r.ItemName)
-            .ToListAsync();// If no specific locationId was provided, try to get location info from the first recap item
-        if (!_locationId.HasValue && _recapItems?.Any() == true)
-        {
-            int? targetLocationId = _recapItems.FirstOrDefault()?.Location;
-            
-            if (targetLocationId.HasValue)
-            {
-                var location = await dbContext.Locations
-                    .FirstOrDefaultAsync(l => l.Id == targetLocationId.Value);
-
-                if (location != null)
-                {
-                    _locationName = location.Name ?? "";
-                    _voyageNumber = location.VoyageNumber ?? "";
-                    _berth = location.Berth ?? "";
-                    
-                    // Use the location's StartDate if available
-                    if (location.StartDate.HasValue)
-                    {
-                        _displayStartDate = location.StartDate.Value;
-                    }
-                }
-            }
-        }
+            .ToListAsync();
     }
     private void ComposeContent(IContainer container)
     {
@@ -194,12 +170,12 @@ public class RecapDocument : BaseDocument
                 table.Header(header =>
                 {
                     header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("OUT").Bold();
-                    header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("").Bold();
+                    header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("ITEM DESCRIPTION").Bold();
                     header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("RETN").Bold();
                     header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("USED").Bold();
                     header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("OTHER").Bold();
-                });                // Group items by ItemName to calculate totals
-                var groupedItems = _recapItems.GroupBy(r => r.ItemName).ToList();
+                });                // Group items by InvLocId to calculate totals
+                var groupedItems = _recapItems.GroupBy(r => r.InvLocId).ToList();
                 
                 foreach (var group in groupedItems)
                 {
