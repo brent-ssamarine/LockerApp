@@ -102,9 +102,8 @@ public class MaterialListDocument : BaseDocument
         if (_locationId.HasValue)
         {
             query = query.Where(m => m.LocationId == _locationId.Value);
-        }
-
-        var materialList = await query
+        }        var materialList = await query
+            .Where(m => m.ToLocationName == "LOCKER") // Filter for items going to LOCKER
             .OrderBy(m => m.ItemName)
             .ToListAsync();
 

@@ -12,7 +12,6 @@ namespace AccessMigrationApp.Reports;
 public class RecapDocument : BaseDocument
 {
     private readonly DateTime _startDate;
-    private readonly DateTime _endDate;
     private readonly string _inspectedBy;
     private readonly int? _locationId;
     private string _locationName = "";
@@ -23,14 +22,8 @@ public class RecapDocument : BaseDocument
 
     public RecapDocument(
         IServiceProvider serviceProvider,
-        DateTime startDate,
-        DateTime endDate,
-        string inspectedBy,
         int? locationId = null) : base(serviceProvider)
     {
-        _startDate = startDate;
-        _endDate = endDate;
-        _inspectedBy = inspectedBy;
         _locationId = locationId;
     }
 
