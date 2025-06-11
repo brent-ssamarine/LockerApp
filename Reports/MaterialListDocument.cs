@@ -96,46 +96,50 @@ public class MaterialListDocument : BaseDocument
         using var scope = ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
 
-        // Load material list data based on location ID and convert to ViewModel
-        var query = dbContext.MaterialLists.AsQueryable();
+        // First, get the location info for the header
+        if (_locationId.HasValue)
+        {
+            var location = await dbContext.Locations
+                .FirstOrDefaultAsync(l => l.Id == _locationId.Value);
+                
+            if (location != null)
+            {
+                _locationName = location.Name ?? "";
+                _berth = location.Berth ?? "";
+                _startDate = location.StartDate ?? DateTime.Today;
+            }
+        }
+
+        // Load and group material list data by ItemName and Description
+        var materialQuery = dbContext.MaterialLists.AsQueryable();
 
         if (_locationId.HasValue)
         {
-            query = query.Where(m => m.LocationId == _locationId.Value);
+            materialQuery = materialQuery.Where(m => m.LocationId == _locationId.Value);
         }
 
-        var materialList = await query
-            .OrderBy(m => m.ItemName)
+        // Group by ItemName and Description, sum quantities
+        var groupedMaterials = await materialQuery
+            .GroupBy(m => new { m.ItemName, m.Description, m.InvType })
+            .Select(g => new 
+            {
+                g.Key.ItemName,
+                g.Key.Description,
+                g.Key.InvType,
+                TotalQuantity = g.Sum(x => x.Quantity)
+            })
+            .Where(g => g.TotalQuantity > 0) // Only include items with quantity > 0
+            .OrderBy(g => g.ItemName)
             .ToListAsync();
 
-        // Convert to MaterialListViewModel and extract the specific fields
-        _materialItems = materialList.Select(m => new MaterialListViewModel
+        // Convert to view model
+        _materialItems = groupedMaterials.Select(m => new MaterialListViewModel
         {
-            LocationId = m.LocationId,
-            FromLocationName = m.FromLocationName,
-            Berth = m.Berth,
-            StartDate = m.StartDate,
-            ItemName = m.ItemName,
+            ItemName = m.ItemName ?? "",
             Description = m.Description,
-            Quantity = m.Quantity,
+            Quantity = m.TotalQuantity,
             InvType = m.InvType
         }).ToList();
-
-        // Extract header information - group by loc_id to get header data
-        if (_materialItems.Any())
-        {
-            var headerGroup = _materialItems
-                .GroupBy(m => m.LocationId)
-                .FirstOrDefault();
-                
-            if (headerGroup != null)
-            {
-                var headerItem = headerGroup.First();
-                _locationName = headerItem.FromLocationName ?? "";
-                _berth = headerItem.Berth ?? "";
-                _startDate = headerItem.StartDate ?? DateTime.Today;
-            }
-        }
     }
 
     private void ComposeContent(IContainer container)
