@@ -1,5 +1,6 @@
 using AccessMigrationApp.Data.LockerDB;
 using AccessMigrationApp.Models.LockerDB;
+using AccessMigrationApp.Models.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using QuestPDF.Fluent;
@@ -11,10 +12,10 @@ namespace AccessMigrationApp.Reports;
 public class MaterialListDocument : BaseDocument
 {
     private readonly int? _locationId;
-    private readonly string _locationName;
-    private readonly string _berth;
-    private readonly DateTime _startDate;
-    private List<MaterialList>? _materialItems;
+    private string _locationName = "";
+    private string _berth = "";
+    private DateTime _startDate = DateTime.Today;
+    private List<MaterialListViewModel>? _materialItems;
 
     public MaterialListDocument(
         IServiceProvider serviceProvider,
@@ -95,22 +96,46 @@ public class MaterialListDocument : BaseDocument
         using var scope = ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
 
-        // Load material list data based on location
+        // Load material list data based on location ID and convert to ViewModel
         var query = dbContext.MaterialLists.AsQueryable();
 
         if (_locationId.HasValue)
         {
             query = query.Where(m => m.LocationId == _locationId.Value);
         }
-        else if (!string.IsNullOrEmpty(_locationName))
-        {
-            query = query.Where(m => m.FromLocationName == _locationName || m.ToLocationName == _locationName);
-        }
 
-        _materialItems = await query
-            .Where(m => m.InvType == "MATRL") // Only materials
+        var materialList = await query
             .OrderBy(m => m.ItemName)
             .ToListAsync();
+
+        // Convert to MaterialListViewModel and extract the specific fields
+        _materialItems = materialList.Select(m => new MaterialListViewModel
+        {
+            LocationId = m.LocationId,
+            FromLocationName = m.FromLocationName,
+            Berth = m.Berth,
+            StartDate = m.StartDate,
+            ItemName = m.ItemName,
+            Description = m.Description,
+            Quantity = m.Quantity,
+            InvType = m.InvType
+        }).ToList();
+
+        // Extract header information - group by loc_id to get header data
+        if (_materialItems.Any())
+        {
+            var headerGroup = _materialItems
+                .GroupBy(m => m.LocationId)
+                .FirstOrDefault();
+                
+            if (headerGroup != null)
+            {
+                var headerItem = headerGroup.First();
+                _locationName = headerItem.FromLocationName ?? "";
+                _berth = headerItem.Berth ?? "";
+                _startDate = headerItem.StartDate ?? DateTime.Today;
+            }
+        }
     }
 
     private void ComposeContent(IContainer container)
@@ -131,38 +156,31 @@ public class MaterialListDocument : BaseDocument
                 // Define columns
                 table.ColumnsDefinition(columns =>
                 {
-                    columns.ConstantColumn(40);    // Quantity
                     columns.RelativeColumn(4);     // Item Description  
-                    columns.ConstantColumn(80);    // MATRL
+                    columns.ConstantColumn(60);    // Quantity
+                    columns.ConstantColumn(80);    // InvType
                 });
 
                 // Table header
                 table.Header(header =>
                 {
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("").Bold();
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("").Bold();
-                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("MATRL").Bold();
-                });
-
-                // Table content - group by item name and sum quantities
-                var groupedItems = _materialItems.GroupBy(m => m.ItemName).ToList();
-                
-                foreach (var group in groupedItems)
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("ITEM NAME").Bold();
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("QTY").Bold();
+                    header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("TYPE").Bold();
+                });                // Table content - show individual records without grouping
+                foreach (var item in _materialItems)
                 {
-                    var item = group.First();
-                    var totalQuantity = group.Sum(g => g.Quantity ?? 0);
-                    
                     // Apply VBA logic - only show items with quantity > 0
-                    if (totalQuantity > 0)
+                    if (item.Quantity > 0)
                     {
-                        var qtyDisplay = totalQuantity > 0 ? totalQuantity.ToString("0") : "";
+                        var qtyDisplay = item.Quantity > 0 ? item.Quantity?.ToString("0") ?? "" : "";
                         var itemDisplay = !string.IsNullOrWhiteSpace(item.Description) 
                             ? $"{item.ItemName?.Trim()} - {item.Description.Trim()}"
                             : item.ItemName?.Trim() ?? "";
 
-                        table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(qtyDisplay);
                         table.Cell().Border(0.5f).BorderColor(Colors.Black).PaddingVertical(2).PaddingLeft(5).Text(itemDisplay);
-                        table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("MATRL");
+                        table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(qtyDisplay);
+                        table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text(item.InvType ?? "");
                     }
                 }
             });

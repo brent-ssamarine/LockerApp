@@ -551,9 +551,8 @@ public class MaterialList
     
     [Column("item_name")]
     public string? ItemName { get; set; }
-    
-    [Column("quantity")]
-    public float? Quantity { get; set; }
+      [Column("quantity")]
+    public double? Quantity { get; set; }
     
     [Column("to_locname")]
     public string? ToLocationName { get; set; }

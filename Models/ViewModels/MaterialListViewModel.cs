@@ -8,9 +8,8 @@ namespace AccessMigrationApp.Models.ViewModels
         public string? FromLocationName { get; set; }
         public string? Description { get; set; }
         public string? Berth { get; set; }
-        public DateTime? StartDate { get; set; }
-        public string? ItemName { get; set; }
-        public float? Quantity { get; set; }
+        public DateTime? StartDate { get; set; }        public string? ItemName { get; set; }
+        public double? Quantity { get; set; }
         public string? ToLocationName { get; set; }
         public string? InvType { get; set; }
 
