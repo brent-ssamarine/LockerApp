@@ -137,7 +137,7 @@ else
         <div class="row g-3 align-items-end">
             <div class="col-auto">
                 <label>Print List For</label>
-                <select class="form-select location-select" @bind="selectedPrintLocation">
+                <select class="form-select location-select" @bind="selectedTargetLocation">
                     <option value="">Select...</option>
                     @if (LocationId.HasValue)
                     {
@@ -392,7 +392,7 @@ else
     private List<LocationViewModel>? targetLocations;
     private List<Location>? transferLocations;
     private List<LocationType>? locationTypes;
-    private string? selectedPrintLocation;
+    private string? selectedTargetLocation;
     private string? selectedTransferLocation;
     private string? selectedTakenFromType;
     private string inspectedBy = "";
@@ -403,7 +403,7 @@ else
     private List<string>? asOfDateOptions;
     private string? selectedAsOfDateString;
 
-    private bool CanPrint => !string.IsNullOrEmpty(selectedPrintLocation);
+    private bool CanPrint => !string.IsNullOrEmpty(selectedTargetLocation);
 
     private bool isAscending = true;
     private string currentSortField = "ItemName";
@@ -413,7 +413,7 @@ else
         // Set the initial selected location
         if (LocationId.HasValue)
         {
-            selectedPrintLocation = LocationId.Value.ToString();
+            selectedTargetLocation = LocationId.Value.ToString();
         }
 
         await LoadLocations();
@@ -434,6 +434,7 @@ else
 
             targetLocations = await dbContext.Locations
                 .Where(l => 
+                    l.Id != LocationId.Value &&  // loc_id <> current location
                     l.Finished != 1 &&               // finished = False
                     l.LocationType != "SUPPLIER" &&  // loc_type <> "SUPPLIER"
                     l.LocationType != null) 
@@ -602,9 +603,9 @@ else
     private async Task PrintInventoryList()
     {
         Console.WriteLine("Starting print...");
-        if (!int.TryParse(selectedPrintLocation, out int locationId))
+        if (!int.TryParse(selectedTargetLocation, out int locationId))
         {
-            Console.WriteLine($"Failed to parse location ID: {selectedPrintLocation}");
+            Console.WriteLine($"Failed to parse location ID: {selectedTargetLocation}");
             return;
         }
 
@@ -689,7 +690,8 @@ else
             setTimeout(() => URL.revokeObjectURL(url), 60000);
         ");
           Console.WriteLine("PDF opened in new tab");
-    }    private async Task PrintRecap()
+    }    
+    private async Task PrintRecap()
     {
         Console.WriteLine("Starting recap print...");
         
@@ -718,7 +720,8 @@ else
             Console.WriteLine($"Error generating recap PDF: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
-    }    private async Task PrintMaterials()
+    }    
+    private async Task PrintMaterials()
     {
         Console.WriteLine("Starting materials print...");
         
@@ -730,21 +733,10 @@ else
                 return;
             }
 
-            var selectedLocation = targetLocations?.FirstOrDefault(l => l.Id == LocationId);
-            if (selectedLocation == null)
-            {
-                Console.WriteLine($"Current location not found: {LocationId}");
-                return;
-            }
-
             Console.WriteLine($"Generating material list PDF for location {LocationId}...");
             
             // Generate material list for the current location
-            var pdfBytes = await ReportService.GenerateMaterialListPdf(
-                LocationId.Value,
-                selectedLocation.Name,
-                selectedLocation.Berth,
-                DateTime.Today);
+            var pdfBytes = await ReportService.GenerateMaterialListPdf(LocationId.Value);
             
             await ShowPdf(pdfBytes, LocationId.Value);
         }

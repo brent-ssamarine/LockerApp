@@ -18,15 +18,9 @@ public class MaterialListDocument : BaseDocument
 
     public MaterialListDocument(
         IServiceProvider serviceProvider,
-        int? locationId,
-        string locationName,
-        string berth,
-        DateTime startDate) : base(serviceProvider)
+        int? locationId) : base(serviceProvider)
     {
         _locationId = locationId;
-        _locationName = locationName;
-        _berth = berth;
-        _startDate = startDate;
     }
 
     public async Task PrepareAsync()
