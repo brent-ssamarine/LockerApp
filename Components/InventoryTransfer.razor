@@ -186,8 +186,8 @@
     [Parameter] public int InvlocId { get; set; }
     [Parameter] public string ItemId { get; set; } = "";
     [Parameter] public string ItemName { get; set; } = "";
-    private List<InventoryTransferViewModel>? transferDetails;
-    private List<InventoryTransferViewModel>? originalTransferDetails;
+    private List<InvTranViewModel>? transferDetails;
+    private List<InvTranViewModel>? originalTransferDetails;
     private HashSet<int> changedRecords = new();
     private bool isLoading = false;
     private bool isSaving = false;
@@ -239,7 +239,7 @@
                            t.ItemId != null && 
                            t.ItemId.Trim().ToLower() == trimmedItemId.ToLower())
                 .OrderByDescending(t => t.TransferDate)
-                .Select(t => new InventoryTransferViewModel
+                .Select(t => new InvTranViewModel
                 {
                     Id = t.Id,
                     ItemId = t.ItemId,
@@ -271,7 +271,7 @@
                                t.ItemId != null && 
                                t.ItemId.Trim().ToLower() == trimmedItemId.ToLower())
                     .OrderByDescending(t => t.TransferDate)
-                    .Select(t => new InventoryTransferViewModel
+                    .Select(t => new InvTranViewModel
                     {
                         Id = t.Id,
                         ItemId = t.ItemId,
@@ -296,7 +296,7 @@
             // Create backup of original data for cancel functionality
             if (transferDetails != null)
             {
-                originalTransferDetails = transferDetails.Select(t => new InventoryTransferViewModel
+                originalTransferDetails = transferDetails.Select(t => new InvTranViewModel
                 {
                     Id = t.Id,
                     ItemId = t.ItemId,
@@ -319,7 +319,7 @@
         }
         catch (Exception)
         {
-            transferDetails = new List<InventoryTransferViewModel>();
+            transferDetails = new List<InvTranViewModel>();
         }
         finally
         {
@@ -327,12 +327,12 @@
             StateHasChanged();
             _loadingSemaphore.Release();
         }
-    }    private void OnFieldChanged(InventoryTransferViewModel transfer)
+    }    private void OnFieldChanged(InvTranViewModel transfer)
     {
         changedRecords.Add(transfer.Id);
         hasChanges = changedRecords.Any();
         StateHasChanged();
-    }    private void UpdateQuantity(InventoryTransferViewModel transfer, string? value)
+    }    private void UpdateQuantity(InvTranViewModel transfer, string? value)
     {
         if (double.TryParse(value, out double result))
         {
@@ -343,7 +343,7 @@
             transfer.Quantity = null;
         }
         OnFieldChanged(transfer);
-    }    private void UpdateCostPer(InventoryTransferViewModel transfer, string? value)
+    }    private void UpdateCostPer(InvTranViewModel transfer, string? value)
     {
         if (double.TryParse(value, out double result))
         {
@@ -356,13 +356,13 @@
         OnFieldChanged(transfer);
     }
 
-    private void UpdatePONumber(InventoryTransferViewModel transfer, string? value)
+    private void UpdatePONumber(InvTranViewModel transfer, string? value)
     {
         transfer.PONumber = value;
         OnFieldChanged(transfer);
     }
 
-    private void UpdateInspectedBy(InventoryTransferViewModel transfer, string? value)
+    private void UpdateInspectedBy(InvTranViewModel transfer, string? value)
     {
         transfer.InspectedBy = value;
         OnFieldChanged(transfer);
@@ -399,7 +399,7 @@
             // Update original data and clear changes
             if (transferDetails != null)
             {
-                originalTransferDetails = transferDetails.Select(t => new InventoryTransferViewModel
+                originalTransferDetails = transferDetails.Select(t => new InvTranViewModel
                 {
                     Id = t.Id,
                     ItemId = t.ItemId,
