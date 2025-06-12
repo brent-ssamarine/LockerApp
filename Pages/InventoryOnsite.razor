@@ -21,6 +21,27 @@
     </div>
 </div>
 
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @errorMessage
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(noDataMessage))
+{
+    <div class="alert alert-info" role="alert">
+        @noDataMessage
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success" role="alert">
+        @successMessage
+    </div>
+}
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>
         Inventory
@@ -392,6 +413,9 @@ else
     private List<LocationViewModel>? targetLocations;
     private List<Location>? transferLocations;
     private List<LocationType>? locationTypes;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? noDataMessage;
     private string? selectedTargetLocation;
     private string? selectedTransferLocation;
     private string? selectedTakenFromType;
@@ -600,9 +624,14 @@ else
 
     private async Task PrintInventoryList()
     {
+        // Clear any previous messages
+        noDataMessage = null;
+        errorMessage = null;
+        
         Console.WriteLine("Starting gearlist print...");
         if (!int.TryParse(selectedTargetLocation, out int locationId))
         {
+            errorMessage = "Invalid location selected.";
             Console.WriteLine($"Failed to parse location ID: {selectedTargetLocation}");
             return;
         }
@@ -612,20 +641,24 @@ else
             var selectedLocation = targetLocations?.FirstOrDefault(l => l.Id == locationId);
             if (selectedLocation == null)
             {
+                errorMessage = $"Location with ID {locationId} was not found. Please select a valid location.";
                 Console.WriteLine($"Location not found: {locationId}");
+                StateHasChanged(); // Ensure the UI updates to show the error message
                 return;
             }
 
-            byte[] pdfBytes;
+            byte[]? pdfBytes;
             
             // If printing for a different location than current, filter out materials and zero quantities
-            if (locationId != LocationId)
+            if (LocationId.HasValue && locationId != LocationId.Value)
             {
                 Console.WriteLine($"Generating filtered gearlist PDF for different location {locationId}...");
+                var locationName = selectedLocation.Name ?? string.Empty;
+                var berth = selectedLocation.Berth ?? string.Empty;
                 pdfBytes = await ReportService.GenerateGearListPdf(
                     locationId,
-                    selectedLocation.Name,
-                    selectedLocation.Berth,
+                    locationName,
+                    berth,
                     2); // Use 2 to indicate different location filtering
             }
             else
@@ -636,8 +669,8 @@ else
                     Console.WriteLine($"Generating unfiltered gearlist PDF for finished location {locationId}...");
                     pdfBytes = await ReportService.GenerateGearListPdf(
                         locationId,
-                        selectedLocation.Name,
-                        selectedLocation.Berth,
+                        selectedLocation.Name ?? string.Empty,
+                        selectedLocation.Berth ?? string.Empty,
                         1); // Finished = 1, no filtering
                 }
                 else
@@ -645,18 +678,28 @@ else
                     Console.WriteLine($"Generating gearlist PDF with onhand filter for location {locationId}...");
                     pdfBytes = await ReportService.GenerateGearListPdf(
                         locationId,
-                        selectedLocation.Name,
-                        selectedLocation.Berth,
-                        0); // Finished = 0, filter onhand only
+                        selectedLocation.Name ?? string.Empty,
+                        selectedLocation.Berth ?? string.Empty,
+                        0); // Not finished, filter out zero quantities only
                 }
             }
 
+            if (pdfBytes == null || pdfBytes.Length == 0)
+            {
+                noDataMessage = "No gear items found to display for the selected location.";
+                Console.WriteLine("No data to display for gear list");
+                StateHasChanged();
+                return;
+            }
+            
             await ShowPdf(pdfBytes, locationId);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error generating GearList PDF: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            errorMessage = $"Error generating PDF: {ex.Message}";
+            Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
+            StateHasChanged();
         }
     }
 
@@ -691,10 +734,22 @@ else
     }    
     private async Task PrintRecap()
     {
+        // Clear any previous messages
+        noDataMessage = null;
+        errorMessage = null;
+        
         Console.WriteLine("Starting recap print...");
         
         try
         {
+            if (!LocationId.HasValue)
+            {
+                Console.WriteLine("No location selected");
+                errorMessage = "Please select a location before generating the recap report.";
+                StateHasChanged();
+                return;
+            }
+
             // Use date range from form if available, otherwise default to last 30 days
             var endDate = DateTime.Today;
             var startDate = endDate.AddDays(-30);
@@ -708,8 +763,17 @@ else
             
             // Use the inspectedBy field if available, otherwise empty string
             var inspector = string.IsNullOrEmpty(inspectedBy) ? "" : inspectedBy;
-              Console.WriteLine($"Generating recap PDF from {startDate:MM/dd/yyyy} to {endDate:MM/dd/yyyy} for inspector: {inspector} at location: {LocationId}");
+            Console.WriteLine($"Generating recap PDF from {startDate:MM/dd/yyyy} to {endDate:MM/dd/yyyy} for inspector: {inspector} at location: {LocationId}");
+            
             var pdfBytes = await ReportService.GenerateRecapPdf(LocationId);
+            
+            if (pdfBytes == null || pdfBytes.Length == 0)
+            {
+                Console.WriteLine("No recap data found for the selected location and date range");
+                noDataMessage = "No recap data found for the selected location and date range.";
+                StateHasChanged();
+                return;
+            }
             
             await ShowRecapPdf(pdfBytes);
         }
@@ -721,6 +785,10 @@ else
     }    
     private async Task PrintMaterials()
     {
+        // Clear any previous messages
+        noDataMessage = null;
+        errorMessage = null;
+        
         Console.WriteLine("Starting materials print...");
         
         try
@@ -728,6 +796,8 @@ else
             if (!LocationId.HasValue)
             {
                 Console.WriteLine("No location selected");
+                errorMessage = "Please select a location before generating the material list.";
+                StateHasChanged();
                 return;
             }
 
@@ -736,12 +806,22 @@ else
             // Generate material list for the current location
             var pdfBytes = await ReportService.GenerateMaterialListPdf(LocationId.Value);
             
+            if (pdfBytes == null)
+            {
+                Console.WriteLine("No material data found for the selected location");
+                noDataMessage = "No material data found for the selected location.";
+                StateHasChanged();
+                return;
+            }
+            
             await ShowPdf(pdfBytes, LocationId.Value);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error generating material list PDF: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            errorMessage = $"An error occurred while generating the material list: {ex.Message}";
+            StateHasChanged();
         }
     }
 

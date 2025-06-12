@@ -17,6 +17,8 @@ public class MaterialListDocument : BaseDocument
     private DateTime _startDate = DateTime.Today;
     private List<MaterialListViewModel>? _materialItems;
 
+    public bool HasData => _materialItems != null && _materialItems.Any();
+
     public MaterialListDocument(
         IServiceProvider serviceProvider,
         int? locationId) : base(serviceProvider)
@@ -146,9 +148,17 @@ public class MaterialListDocument : BaseDocument
     {
         LoadData().Wait();
 
-        if (_materialItems == null || !_materialItems.Any())
+        if (!HasData)
         {
-            container.Text("No materials found.");
+            container.Height(200)
+                   .AlignCenter()
+                   .AlignMiddle()
+                   .Text(text =>
+                   {
+                       text.Span("NO MATERIALS FOUND").Bold().FontSize(16);
+                       text.EmptyLine();
+                       text.Span("There are no materials to display for the selected location.").FontSize(12);
+                   });
             return;
         }
 
@@ -172,19 +182,22 @@ public class MaterialListDocument : BaseDocument
                     header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("QTY").Bold();
                     header.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("TYPE").Bold();
                 });                // Table content - show individual records without grouping
-                foreach (var item in _materialItems)
+                if (_materialItems != null)
                 {
-                    // Apply VBA logic - only show items with quantity > 0
-                    if (item.Quantity > 0)
+                    foreach (var item in _materialItems)
                     {
-                        var qtyDisplay = item.Quantity > 0 ? item.Quantity?.ToString("0") ?? "" : "";
-                        var itemDisplay = !string.IsNullOrWhiteSpace(item.Description) 
-                            ? $"{item.ItemName?.Trim()} - {item.Description.Trim()}"
-                            : item.ItemName?.Trim() ?? "";
+                        // Apply VBA logic - only show items with quantity > 0
+                        if (item.Quantity > 0)
+                        {
+                            var qtyDisplay = item.Quantity > 0 ? item.Quantity?.ToString("0") ?? "" : "";
+                            var itemDisplay = !string.IsNullOrWhiteSpace(item.Description) 
+                                ? $"{item.ItemName?.Trim()} - {item.Description.Trim()}"
+                                : item.ItemName?.Trim() ?? "";
 
-                        table.Cell().Border(0.5f).BorderColor(Colors.Black).PaddingVertical(2).PaddingLeft(5).Text(itemDisplay);
-                        table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(qtyDisplay);
-                        table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text(item.InvType ?? "");
+                            table.Cell().Border(0.5f).BorderColor(Colors.Black).PaddingVertical(2).PaddingLeft(5).Text(itemDisplay);
+                            table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignRight().PaddingVertical(2).PaddingRight(5).Text(qtyDisplay);
+                            table.Cell().Border(0.5f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text(item.InvType?.Trim() ?? "");
+                        }
                     }
                 }
             });

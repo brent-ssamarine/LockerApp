@@ -18,6 +18,8 @@ public class GearListDocument : IDocument
     private readonly int _finished;
     private List<InventoryOnsiteViewModel>? _gearItems;
 
+    public bool HasData => _gearItems != null && _gearItems.Any();
+
     public GearListDocument(
         IServiceProvider serviceProvider,
         int locationId,
@@ -146,7 +148,15 @@ public class GearListDocument : IDocument
     {
         if (_gearItems == null || !_gearItems.Any())
         {
-            container.Text("No items found.");
+            container.Height(200) // Set a minimum height to center vertically
+                   .AlignCenter()
+                   .AlignMiddle()
+                   .Text(text =>
+                   {
+                       text.Span("NO GEAR ITEMS FOUND").Bold().FontSize(16);
+                       text.EmptyLine();
+                       text.Span("There are no gear items to display for the selected location.").FontSize(12);
+                   });
             return;
         }
 

@@ -12,13 +12,15 @@ namespace AccessMigrationApp.Reports;
 public class RecapDocument : BaseDocument
 {
     private readonly DateTime _startDate;
-    private readonly string _inspectedBy;
+    private readonly string? _inspectedBy;
     private readonly int? _locationId;
     private string _locationName = "";
     private string _voyageNumber = "";
     private string _berth = "";
     private DateTime _displayStartDate = DateTime.Today;
     private List<RecapViewModel>? _recapItems;
+
+    public bool HasData => _recapItems != null && _recapItems.Any();
 
     public RecapDocument(
         IServiceProvider serviceProvider,
@@ -30,7 +32,9 @@ public class RecapDocument : BaseDocument
     public async Task PrepareAsync()
     {
         await LoadData();
-    }    public override void Compose(IDocumentContainer container)
+    }
+
+    public override void Compose(IDocumentContainer container)
     {
         container
             .Page(page =>
@@ -45,10 +49,13 @@ public class RecapDocument : BaseDocument
                 page.Content().Element(ComposeContent);
                 page.Footer().Element(ComposeFooter);
             });
-    }private void ComposeHeader(IContainer container)
+    }
+
+    private void ComposeHeader(IContainer container)
     {
         container.Column(column =>
-        {            // First header line - Company info and date/page
+        {
+            // First header line - Company info and date/page
             column.Item().Row(row =>
             {
                 row.RelativeItem().Text("SSA Marine Canada").FontSize(8);
@@ -65,7 +72,9 @@ public class RecapDocument : BaseDocument
             });
 
             // Second header line
-            column.Item().Text("locker:recap").FontSize(8);// Title section with vessel, berth, and starting date
+            column.Item().Text("locker:recap").FontSize(8);
+
+            // Title section with vessel, berth, and starting date
             column.Item().PaddingVertical(5).Row(row =>
             {
                 row.RelativeItem(2).Column(c =>
@@ -90,12 +99,16 @@ public class RecapDocument : BaseDocument
                 });
             });
         });
-    }    private async Task LoadData()
+    }
+
+    private async Task LoadData()
     {
-        if (_recapItems != null) return; 
+        if (_recapItems != null) return;
 
         using var scope = ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();        // Load header information from Location model based on locationId
+        var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
+
+        // Load header information from Location model based on locationId
         if (_locationId.HasValue)
         {
             var location = await dbContext.Locations
@@ -136,13 +149,22 @@ public class RecapDocument : BaseDocument
             .OrderBy(r => r.ItemName)
             .ToListAsync();
     }
+
     private void ComposeContent(IContainer container)
     {
         LoadData().Wait();
 
-        if (_recapItems == null || !_recapItems.Any())
+        if (!HasData)
         {
-            container.Text("No items found.");
+            container.Height(200)
+                   .AlignCenter()
+                   .AlignMiddle()
+                   .Text(text =>
+                   {
+                       text.Span("NO RECAP DATA FOUND").Bold().FontSize(16);
+                       text.EmptyLine();
+                       text.Span("There is no recap data to display for the selected location and date range.").FontSize(12);
+                   });
             return;
         }
 
@@ -168,6 +190,8 @@ public class RecapDocument : BaseDocument
                     header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("USED").Bold();
                     header.Cell().Border(0.25f).BorderColor(Colors.Black).AlignCenter().PaddingVertical(2).Text("OTHER").Bold();
                 });                // Group items by InvLocId to calculate totals
+                if (_recapItems == null) return;
+                
                 var groupedItems = _recapItems.GroupBy(r => r.InvLocId).ToList();
                 
                 foreach (var group in groupedItems)
