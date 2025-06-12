@@ -692,7 +692,7 @@ else
                 return;
             }
             
-            await ShowPdf(pdfBytes, locationId);
+            await ShowPdf(pdfBytes, locationId, "gearlist");
         }
         catch (Exception ex)
         {
@@ -703,35 +703,6 @@ else
         }
     }
 
-    private async Task ShowPdf(byte[] pdfBytes, int locationId)
-    {
-        if (pdfBytes == null || pdfBytes.Length == 0)
-        {
-            Console.WriteLine("PDF generation failed - no bytes returned");
-            return;
-        }
-
-        // Convert the PDF bytes to a base64 string
-        var base64 = Convert.ToBase64String(pdfBytes);
-        Console.WriteLine("PDF converted to base64");
-        
-        // Open PDF in new tab using JavaScript
-        var filename = $"gear_list_{locationId}_{DateTime.Now:yyyyMMdd}.pdf";
-        await JSRuntime.InvokeVoidAsync("eval", $@"
-            const byteCharacters = atob('{base64}');
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {{
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }}
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], {{ type: 'application/pdf' }});
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
-            // Clean up the URL after 1 minute
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-        ");
-          Console.WriteLine("PDF opened in new tab");
-    }    
     private async Task PrintRecap()
     {
         // Clear any previous messages
@@ -775,7 +746,7 @@ else
                 return;
             }
             
-            await ShowRecapPdf(pdfBytes);
+            await ShowPdf(pdfBytes, LocationId.Value, "recap");
         }
         catch (Exception ex)
         {
@@ -814,7 +785,7 @@ else
                 return;
             }
             
-            await ShowPdf(pdfBytes, LocationId.Value);
+            await ShowPdf(pdfBytes, LocationId.Value, "materials");
         }
         catch (Exception ex)
         {
@@ -825,35 +796,52 @@ else
         }
     }
 
-    private async Task ShowRecapPdf(byte[] pdfBytes)
+    private async Task ShowPdf(byte[] pdfBytes, int locationId, string reportType = "report")
     {
         if (pdfBytes == null || pdfBytes.Length == 0)
         {
-            Console.WriteLine("Recap PDF generation failed - no bytes returned");
+            Console.WriteLine($"{reportType} PDF generation failed - no bytes returned");
+            errorMessage = $"Failed to generate {reportType} PDF: No data available";
+            StateHasChanged();
             return;
         }
 
-        // Convert the PDF bytes to a base64 string
-        var base64 = Convert.ToBase64String(pdfBytes);
-        Console.WriteLine("Recap PDF converted to base64");
-        
-        // Open PDF in new tab using JavaScript
-        var filename = $"recap_report_{DateTime.Now:yyyyMMdd}.pdf";
-        await JSRuntime.InvokeVoidAsync("eval", $@"
-            const byteCharacters = atob('{base64}');
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {{
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }}
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], {{ type: 'application/pdf' }});
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
-            // Clean up the URL after 1 minute
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-        ");
-        
-        Console.WriteLine("Recap PDF opened in new tab");
+        try
+        {
+            // Convert the PDF bytes to a base64 string
+            var base64 = Convert.ToBase64String(pdfBytes);
+            Console.WriteLine($"{reportType} PDF converted to base64");
+            
+            // Generate a filename based on report type and timestamp
+            var filename = $"{reportType.ToLower()}_{locationId}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+            
+            // Open PDF in new tab using JavaScript
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+                const byteCharacters = atob('{base64}');
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {{
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }}
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], {{ type: 'application/pdf' }});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.download = '{filename}';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error showing {reportType} PDF: {ex.Message}");
+            errorMessage = $"Error displaying {reportType} PDF: {ex.Message}";
+            StateHasChanged();
+        }
     }
 
     private void ItemNameChanged(InventoryOnsiteViewModel item, ChangeEventArgs e)
