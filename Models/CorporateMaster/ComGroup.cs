@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace AccessMigrationApp.Models.CorporateMaster;
+namespace LockerApp.Models.CorporateMaster;
 
 [Table("comgroup")]
 public class ComGroup

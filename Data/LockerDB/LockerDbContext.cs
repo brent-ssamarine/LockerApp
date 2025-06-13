@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using AccessMigrationApp.Models.LockerDB;
+using LockerApp.Models.LockerDB;
 
-namespace AccessMigrationApp.Data.LockerDB;
+namespace LockerApp.Data.LockerDB;
 
 public class LockerDbContext : DbContext
 {

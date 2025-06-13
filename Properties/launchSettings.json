@@ -8,7 +8,7 @@
     }
   },
   "profiles": {
-    "AccessMigrationApp": {
+    "LockerApp": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,

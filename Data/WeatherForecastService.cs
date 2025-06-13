@@ -1,4 +1,4 @@
-namespace AccessMigrationApp.Data;
+namespace LockerApp.Data;
 
 public class WeatherForecastService
 {

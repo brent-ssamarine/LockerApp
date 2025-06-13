@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using AccessMigrationApp.Models.BCMEA;
+using LockerApp.Models.BCMEA;
 
-namespace AccessMigrationApp.Data.BCMEA;
+namespace LockerApp.Data.BCMEA;
 
 public class BCMEAContext : DbContext
 {

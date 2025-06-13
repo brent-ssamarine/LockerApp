@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AccessMigrationApp", "AccessMigrationApp.csproj", "{51828E5D-2CD2-580F-58B6-3B64D5B6DCF2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LockerApp", "LockerApp.csproj", "{51828E5D-2CD2-580F-58B6-3B64D5B6DCF2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

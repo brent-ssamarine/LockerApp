@@ -2,7 +2,7 @@ using QuestPDF.Drawing;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
 
-namespace AccessMigrationApp.Reports;
+namespace LockerApp.Reports;
 
 public abstract class BaseDocument : IDocument
 {

@@ -1,11 +1,11 @@
-using AccessMigrationApp.Data.LockerDB;
-using AccessMigrationApp.Models.LockerDB;
+using LockerApp.Data.LockerDB;
+using LockerApp.Models.LockerDB;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
-namespace AccessMigrationApp.Reports;
+namespace LockerApp.Reports;
 
 public class TestSchedulerDocument : BaseDocument
 {

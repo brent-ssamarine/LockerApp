@@ -1,6 +1,6 @@
 using System;
 
-namespace AccessMigrationApp.Models.ViewModels
+namespace LockerApp.Models.ViewModels
 {
     public class RecapViewModel
     {
@@ -34,7 +34,7 @@ namespace AccessMigrationApp.Models.ViewModels
         }
         
         // Constructor from Recap model
-        public RecapViewModel(AccessMigrationApp.Models.LockerDB.Recap recap)
+        public RecapViewModel(LockerApp.Models.LockerDB.Recap recap)
         {
             InvLocId = recap.invlocId;
             Location = recap.Location;
@@ -53,9 +53,9 @@ namespace AccessMigrationApp.Models.ViewModels
         }
         
         // Method to convert back to Recap model
-        public AccessMigrationApp.Models.LockerDB.Recap ToModel()
+        public LockerApp.Models.LockerDB.Recap ToModel()
         {
-            return new AccessMigrationApp.Models.LockerDB.Recap
+            return new LockerApp.Models.LockerDB.Recap
             {
                 invlocId = InvLocId,
                 Location = Location,

@@ -1,6 +1,6 @@
-using AccessMigrationApp.Models.LockerDB;
+using LockerApp.Models.LockerDB;
 
-namespace AccessMigrationApp.Models.ViewModels
+namespace LockerApp.Models.ViewModels
 {
     public class MaterialListViewModel
     {

@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using AccessMigrationApp.Models.LockerDB;
+using LockerApp.Models.LockerDB;
 
-namespace AccessMigrationApp.Models.ViewModels
+namespace LockerApp.Models.ViewModels
 {
     public class InventoryViewModel
     {
@@ -18,7 +18,7 @@ namespace AccessMigrationApp.Models.ViewModels
         public short? Active { get; set; }
         public string? TestClass { get; set; }
         public DateTime? Visual { get; set; }
-        public DateTime? Thorough { get; set; }    public static InventoryViewModel FromModel(AccessMigrationApp.Models.LockerDB.Inventory model)
+        public DateTime? Thorough { get; set; }    public static InventoryViewModel FromModel(LockerApp.Models.LockerDB.Inventory model)
     {
         return new InventoryViewModel
         {

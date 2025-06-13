@@ -1,13 +1,13 @@
-using AccessMigrationApp.Data.LockerDB;
-using AccessMigrationApp.Models.LockerDB;
-using AccessMigrationApp.Models.ViewModels;
+using LockerApp.Data.LockerDB;
+using LockerApp.Models.LockerDB;
+using LockerApp.Models.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
-namespace AccessMigrationApp.Reports;
+namespace LockerApp.Reports;
 
 public class MaterialListDocument : BaseDocument
 {

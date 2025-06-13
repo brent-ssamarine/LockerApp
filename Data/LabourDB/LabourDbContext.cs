@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace AccessMigrationApp.Data.LabourDB;
+namespace LockerApp.Data.LabourDB;
 
 public class LabourDbContext : DbContext
 {
@@ -9,7 +9,7 @@ public class LabourDbContext : DbContext
     {
     }
 
-    public DbSet<AccessMigrationApp.Models.LabourDB.Employee> Employees { get; set; }
+    public DbSet<LockerApp.Models.LabourDB.Employee> Employees { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

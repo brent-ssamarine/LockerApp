@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using AccessMigrationApp.Models.CorporateMaster;
+using LockerApp.Models.CorporateMaster;
 
-namespace AccessMigrationApp.Data.CorporateMaster;
+namespace LockerApp.Data.CorporateMaster;
 
 public class CorporateMasterContext : DbContext
 {

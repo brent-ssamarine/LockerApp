@@ -4,16 +4,16 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI;
 using Microsoft.EntityFrameworkCore;
-using AccessMigrationApp.Areas.Identity;
-using AccessMigrationApp.Data;
-using AccessMigrationApp.Data.BCMEA;
-using AccessMigrationApp.Data.CorporateMaster;
-using AccessMigrationApp.Data.LabourDB;
-using AccessMigrationApp.Data.LockerDB;
-using AccessMigrationApp.Services;
+using LockerApp.Areas.Identity;
+using LockerApp.Data;
+using LockerApp.Data.BCMEA;
+using LockerApp.Data.CorporateMaster;
+using LockerApp.Data.LabourDB;
+using LockerApp.Data.LockerDB;
+using LockerApp.Services;
 using QuestPDF.Infrastructure;
 
-namespace AccessMigrationApp;
+namespace LockerApp;
 
 public class Program
 {

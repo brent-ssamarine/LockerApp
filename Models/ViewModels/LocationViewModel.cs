@@ -1,4 +1,4 @@
-namespace AccessMigrationApp.Models.ViewModels;
+namespace LockerApp.Models.ViewModels;
 
 public class LocationViewModel
 {

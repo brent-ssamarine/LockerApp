@@ -1,7 +1,7 @@
-using AccessMigrationApp.Reports;
+using LockerApp.Reports;
 using QuestPDF.Fluent;
 
-namespace AccessMigrationApp.Services;
+namespace LockerApp.Services;
 
 public interface IReportService
 {
@@ -43,7 +43,7 @@ public class ReportService : IReportService
 
     public async Task<byte[]?> GenerateMaterialListPdf(int? locationId)
     {
-        var document = new AccessMigrationApp.Reports.MaterialListDocument(_serviceProvider, locationId);
+        var document = new LockerApp.Reports.MaterialListDocument(_serviceProvider, locationId);
         await document.PrepareAsync();
         
         // Check if there's any data to display

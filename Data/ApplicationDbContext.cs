@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
-namespace AccessMigrationApp.Data;
+namespace LockerApp.Data;
 
 public class ApplicationDbContext : IdentityDbContext
 {

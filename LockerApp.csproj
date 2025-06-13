@@ -3,7 +3,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>aspnet-AccessMigrationApp-39e65863-3b91-4811-a16a-46e79a190dcc</UserSecretsId>
+    <UserSecretsId>aspnet-LockerApp-39e65863-3b91-4811-a16a-46e79a190dcc</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.0.3" />

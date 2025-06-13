@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace AccessMigrationApp.Models.BCMEA;
+namespace LockerApp.Models.BCMEA;
 
 [Table("employees")]
 public class Employee

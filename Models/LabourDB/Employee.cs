@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace AccessMigrationApp.Models.LabourDB;
+namespace LockerApp.Models.LabourDB;
 
 [Table("employees")]
 public class Employee
