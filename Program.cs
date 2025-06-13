@@ -48,6 +48,9 @@ public class Program
 
         // Register report service
         builder.Services.AddScoped<IReportService, ReportService>();
+        
+        // Register LockerService
+        builder.Services.AddScoped<LockerService>();
 
         // Register QuestPDF license
         QuestPDF.Settings.License = LicenseType.Community;

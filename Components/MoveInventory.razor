@@ -2,7 +2,9 @@
 @using LockerApp.Models.LockerDB
 @using Microsoft.EntityFrameworkCore
 @using LockerApp.Data.LockerDB
+@using LockerApp.Services
 @inject IServiceProvider ServiceProvider
+@inject LockerService LockerService
 
 <style>
     .location-select option {
@@ -338,18 +340,33 @@
             var dbContext = scope.ServiceProvider.GetRequiredService<LockerDbContext>();
             Console.WriteLine("DEBUG: Database context created successfully");
 
-            Console.WriteLine($"DEBUG: Looking for FROM record with ID: {FromLocationId}");
+            // Disable change tracking for this context
+            dbContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+
             // Get the FROM inventory location record
             var fromRecord = await dbContext.InventoryLocations
+                .AsNoTracking()
                 .FirstOrDefaultAsync(il => il.Id == FromLocationId);
 
             if (fromRecord == null)
             {
-                Console.WriteLine($"ERROR: Source inventory record not found for ID: {FromLocationId}");
-                Console.WriteLine("ERROR: No inventory record found at source location");
+                Console.WriteLine($"ERROR: No inventory found for ID: {FromLocationId}");
                 return;
             }
             
+            // Create a new instance to avoid tracking
+            fromRecord = new InventoryLocation
+            {
+                Id = fromRecord.Id,
+                ItemId = fromRecord.ItemId,
+                ItemName = fromRecord.ItemName,
+                LocationId = fromRecord.LocationId,
+                Description = fromRecord.Description,
+                Issued = fromRecord.Issued,
+                OnHand = fromRecord.OnHand,
+                Billable = fromRecord.Billable
+            };
+
             Console.WriteLine($"DEBUG: Found FROM record - ID: {fromRecord.Id}, Item: '{fromRecord.ItemId}', ItemName: '{fromRecord.ItemName}', LocationId: {fromRecord.LocationId}, OnHand: {fromRecord.OnHand}");
 
             // Validate sufficient quantity
@@ -360,15 +377,19 @@
                 return;
             }
 
-            // Check if TO location already has this item
+            // Check if a TO record already exists for this item at the destination location
             var toLocationId = int.Parse(ToLocation);
             Console.WriteLine($"DEBUG: Looking for TO record - ItemId: '{fromRecord.ItemId}', LocationId: {toLocationId}");
             
-            var toRecord = await dbContext.InventoryLocations
+            // Get the existing record without tracking
+            var existingToRecord = await dbContext.InventoryLocations
+                .AsNoTracking()
                 .FirstOrDefaultAsync(il => il.ItemId == fromRecord.ItemId && il.LocationId == toLocationId);
-
-            // If TO location doesn't have this item, create it
-            if (toRecord == null)
+                
+            // Declare and initialize toRecord with a new instance if needed
+            InventoryLocation? toRecord = null;
+                
+            if (existingToRecord == null)
             {
                 Console.WriteLine("DEBUG: TO record not found, creating new inventory location");
                 
@@ -398,16 +419,30 @@
                         Console.WriteLine($"DEBUG: Insert successful, {rowsAffected} rows affected");
                         
                         // Find the newly created record
-                        toRecord = await dbContext.InventoryLocations
+                        var newToRecord = await dbContext.InventoryLocations
+                            .AsNoTracking()
                             .Where(il => il.ItemId == fromRecord.ItemId && il.LocationId == toLocationId)
                             .OrderByDescending(il => il.Id) // Get the most recent one
                             .FirstOrDefaultAsync();
                             
-                        if (toRecord == null)
+                        if (newToRecord == null)
                         {
                             Console.WriteLine("ERROR: Failed to find newly created TO record");
                             return;
                         }
+                        
+                        // Create a new instance to avoid tracking
+                        toRecord = new InventoryLocation
+                        {
+                            Id = newToRecord.Id,
+                            ItemId = newToRecord.ItemId,
+                            ItemName = newToRecord.ItemName,
+                            LocationId = newToRecord.LocationId,
+                            Description = newToRecord.Description,
+                            Issued = newToRecord.Issued,
+                            OnHand = newToRecord.OnHand,
+                            Billable = newToRecord.Billable
+                        };
                         Console.WriteLine($"DEBUG: Found newly created TO record - ID: {toRecord.Id}, OnHand: {toRecord.OnHand}");
                     }
                     else
@@ -423,45 +458,75 @@
                     return;
                 }
             }
-            else
+            else if (existingToRecord != null)
             {
+                // Create a new instance to avoid tracking
+                toRecord = new InventoryLocation
+                {
+                    Id = existingToRecord.Id,
+                    ItemId = existingToRecord.ItemId,
+                    ItemName = existingToRecord.ItemName,
+                    LocationId = existingToRecord.LocationId,
+                    Description = existingToRecord.Description,
+                    Issued = existingToRecord.Issued,
+                    OnHand = existingToRecord.OnHand,
+                    Billable = existingToRecord.Billable
+                };
                 Console.WriteLine($"DEBUG: Found existing TO record - ID: {toRecord.Id}, OnHand: {toRecord.OnHand}, LocationId: {toRecord.LocationId}");
+            }
+
+            if (toRecord == null)
+            {
+                Console.WriteLine("ERROR: Failed to initialize TO record");
+                return;
             }
 
             Console.WriteLine("DEBUG: Creating inventory transfer record");
             Console.WriteLine($"DEBUG: Transfer details - Quantity: {TransferQuantity}, FromLocationID: {fromRecord.Id}, ToLocationID: {toRecord.Id}, Company: WES, Job: MOVE, TakenFrom: {TakenFrom}, Date: {AsOfDate:yyyy-MM-dd}");
             
-            // Create the inventory transfer record (equivalent to write_inventory_transfer)
-            await WriteInventoryTransferAsync(
-                dbContext,
-                TransferQuantity,
-                Note,
-                fromRecord,
-                toRecord,
-                "WES", // Company
-                "MOVE", // Job
-                TakenFrom,
-                AsOfDate,
-                PONumber, // PONumber
-                CostPer, // CostPer
-                0, // LockerTotal
-                0, // InventoryTotal
-                InspectedBy
+            // Create the transfer record using the service provider to create a new scope
+            await LockerService.WriteInventoryTransferAsync(
+                TransferQuantity,  // quantity
+                Note,              // description
+                fromRecord,        // fromLocation
+                toRecord,          // toLocation
+                "WES",             // company
+                "MOVE",            // job
+                TakenFrom,         // takenFrom
+                AsOfDate,          // transferDate
+                PONumber,          // poNumber
+                CostPer,           // costPer
+                0,                 // lockerTotal
+                toRecord.OnHand ?? 0, // inventoryTotal
+                InspectedBy,       // inspectedBy
+                ServiceProvider    // serviceProvider
             );
             Console.WriteLine("DEBUG: Inventory transfer record created");
 
             Console.WriteLine("DEBUG: Updating inventory locations");
             Console.WriteLine($"DEBUG: BEFORE Update - FROM OnHand: {fromRecord.OnHand}, TO OnHand: {toRecord.OnHand}");
             
-            // Update inventory locations (equivalent to update_inv_locations)
-            UpdateInventoryLocations(dbContext, TransferQuantity, fromRecord, toRecord);
-            
-            Console.WriteLine($"DEBUG: AFTER Update - FROM OnHand: {fromRecord.OnHand}, TO OnHand: {toRecord.OnHand}");
-            Console.WriteLine("DEBUG: Saving inventory location changes to database");
-            
-            // Only save the inventory location updates since transfer record was inserted via raw SQL
-            await dbContext.SaveChangesAsync();
-            Console.WriteLine("DEBUG: Database save completed successfully");
+            // Update inventory locations using LockerService with transaction handling
+            // This will update the OnHand values, save changes, and handle transactions
+            try
+            {
+                await LockerService.UpdateInventoryLocationsAsync(
+                    TransferQuantity,
+                    fromRecord,
+                    toRecord,
+                    ServiceProvider  // Pass service provider for proper scope handling
+                );
+                Console.WriteLine("DEBUG: Inventory locations updated and committed successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR: Failed to update inventory locations: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"INNER EXCEPTION: {ex.InnerException.Message}");
+                }
+                throw;
+            }
 
             Console.WriteLine("DEBUG: Transfer completed successfully, triggering callbacks");
             await OnMoveCompleted.InvokeAsync(true);
@@ -481,101 +546,6 @@
         }
         
         Console.WriteLine("=== DEBUG: HandleMove() completed ===");
-    }
-
-    // Equivalent to VBA write_inventory_transfer function
-    private async Task WriteInventoryTransferAsync(
-        LockerDbContext dbContext,
-        double quantity,
-        string description,
-        InventoryLocation fromLocation,
-        InventoryLocation toLocation,
-        string company,
-        string job,
-        string takenFrom,
-        DateTime transferDate,
-        string? poNumber,
-        double costPer,
-        double lockerTotal,
-        double inventoryTotal,
-        string inspectedBy)
-    {
-        Console.WriteLine("DEBUG: WriteInventoryTransfer() - Creating transfer record using raw SQL");
-        
-        try
-        {
-            // Use raw SQL to insert into the view/table to avoid Entity Framework view issues
-            var insertSql = @"
-                INSERT INTO [dbo].[invtran] ([item], [item_name], [item_desc], [from_location], [to_location], [company], [job], [taken_from], [transfer_date], [quantity], [costper], [ponum], [inspected_by])
-                VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12)";
-                
-            var parameters = new object[] { 
-                fromLocation.ItemId?.Trim() ?? "", 
-                fromLocation.ItemName?.Trim() ?? "", 
-                description ?? "", 
-                fromLocation.Id, 
-                toLocation.Id, 
-                company ?? "", 
-                job ?? "", 
-                takenFrom ?? "", 
-                transferDate, 
-                quantity, 
-                costPer, 
-                poNumber ?? (object?)null, 
-                inspectedBy ?? ""
-            };
-            
-            Console.WriteLine($"DEBUG: Transfer Record - ItemId: '{fromLocation.ItemId?.Trim()}', ItemName: '{fromLocation.ItemName?.Trim()}', Quantity: {quantity}");
-            Console.WriteLine($"DEBUG: Transfer Record - FromLocation: {fromLocation.Id}, ToLocation: {toLocation.Id}, Date: {transferDate:yyyy-MM-dd}");
-            Console.WriteLine($"DEBUG: Transfer Record - Company: '{company}', Job: '{job}', TakenFrom: '{takenFrom}', InspectedBy: '{inspectedBy}'");
-            
-            Console.WriteLine("DEBUG: Executing raw SQL to create transfer record (avoiding Entity Framework view conflicts)");
-            var rowsAffected = await dbContext.Database.ExecuteSqlRawAsync(insertSql, parameters);
-            
-            if (rowsAffected > 0)
-            {
-                Console.WriteLine($"DEBUG: Transfer record insert successful, {rowsAffected} rows affected");
-            }
-            else
-            {
-                Console.WriteLine("ERROR: Transfer record raw SQL insertion did not affect any rows");
-                throw new InvalidOperationException("Failed to create transfer record");
-            }
-        }
-        catch (Exception sqlException)
-        {
-            Console.WriteLine($"ERROR: Raw SQL transfer record creation failed: {sqlException.Message}");
-            throw new InvalidOperationException("Unable to create transfer record", sqlException);
-        }
-    }
-
-    // Equivalent to VBA update_inv_locations function
-    private void UpdateInventoryLocations(
-        LockerDbContext dbContext,
-        double quantity,
-        InventoryLocation fromLocation,
-        InventoryLocation toLocation)
-    {
-        Console.WriteLine("DEBUG: UpdateInventoryLocations() - Starting inventory updates");
-        Console.WriteLine($"DEBUG: Transfer quantity: {quantity}");
-        Console.WriteLine($"DEBUG: FROM location BEFORE - ID: {fromLocation.Id}, OnHand: {fromLocation.OnHand}");
-        Console.WriteLine($"DEBUG: TO location BEFORE - ID: {toLocation.Id}, OnHand: {toLocation.OnHand}");
-
-        // Decrease quantity from source location
-        var originalFromOnHand = fromLocation.OnHand ?? 0;
-        fromLocation.OnHand = originalFromOnHand - quantity;
-
-        // Increase quantity at destination location  
-        var originalToOnHand = toLocation.OnHand ?? 0;
-        toLocation.OnHand = originalToOnHand + quantity;
-
-        Console.WriteLine($"DEBUG: FROM location AFTER - ID: {fromLocation.Id}, OnHand: {fromLocation.OnHand} (was {originalFromOnHand})");
-        Console.WriteLine($"DEBUG: TO location AFTER - ID: {toLocation.Id}, OnHand: {toLocation.OnHand} (was {originalToOnHand})");
-
-        // Update both records
-        dbContext.InventoryLocations.Update(fromLocation);
-        dbContext.InventoryLocations.Update(toLocation);
-        Console.WriteLine("DEBUG: Both inventory location records updated in context");
     }
 
     private async Task OnClose()
