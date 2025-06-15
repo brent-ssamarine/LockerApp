@@ -190,5 +190,147 @@ namespace LockerApp.Services
                 }
             }
         }
+
+        // Equivalent to VBA move_inventory function
+        public async Task MoveInventoryAsync(
+            int fromLocationId,
+            int toLocationId,
+            string takenFrom,
+            DateTime transferDate,
+            string inspectedBy,
+            IServiceProvider? serviceProvider = null)
+        {
+            Console.WriteLine($"DEBUG: MoveInventoryAsync() - Moving inventory from location {fromLocationId} to {toLocationId}");
+            
+            // Use the provided service provider to create a new scope if needed, otherwise use the injected context
+            var contextToUse = serviceProvider != null ? 
+                serviceProvider.CreateScope().ServiceProvider.GetRequiredService<LockerDbContext>() : 
+                _dbContext;
+            
+            try
+            {
+                // Get all inventory items at the source location with non-zero quantities
+                var fromLocations = await contextToUse.InventoryLocations
+                    .Where(il => il.LocationId == fromLocationId && il.OnHand != 0)
+                    .ToListAsync();
+                
+                Console.WriteLine($"DEBUG: Found {fromLocations.Count} inventory items to transfer from location {fromLocationId}");
+                
+                // Process each inventory item at the source location
+                foreach (var fromLocation in fromLocations)
+                {
+                    if (string.IsNullOrEmpty(fromLocation.ItemId))
+                    {
+                        Console.WriteLine("WARNING: Skipping item with null ItemId");
+                        continue;
+                    }
+                    
+                    // Equivalent to VBA: trim whitespace from item IDs
+                    var itemIdTrimmed = fromLocation.ItemId.Trim();
+                    
+                    // Get the inventory record to check accumulate and inv_type properties
+                    var inventoryItem = await contextToUse.Inventories
+                        .FirstOrDefaultAsync(i => i.Id.Trim() == itemIdTrimmed);
+                    
+                    if (inventoryItem == null)
+                    {
+                        Console.WriteLine($"WARNING: Could not find inventory record for item '{itemIdTrimmed}'");
+                        continue;
+                    }
+                    
+                    bool accumulate = inventoryItem.Accumulate == 1;
+                    string invType = inventoryItem.InvType;
+                    
+                    // Get the location type of the target location
+                    var targetLocation = await contextToUse.Locations
+                        .FirstOrDefaultAsync(l => l.Id == toLocationId);
+                    
+                    if (targetLocation == null)
+                    {
+                        Console.WriteLine($"ERROR: Could not find target location with ID {toLocationId}");
+                        continue;
+                    }
+                    
+                    string locType = targetLocation.LocationType ?? "";
+                    
+                    // Get or create the inventory location record at the target
+                    InventoryLocation toLocation;
+                    
+                    // Check if the item already exists at the target location
+                    var existingToLocation = await contextToUse.InventoryLocations
+                        .FirstOrDefaultAsync(il => il.ItemId != null && il.ItemId.Trim() == itemIdTrimmed && il.LocationId == toLocationId);
+                    
+                    // If the item doesn't exist at the target location or we need a new record
+                    // (For non-YARD locations when accumulate is false)
+                    if (existingToLocation == null || (locType != "YARD" && !accumulate))
+                    {
+                        // Create a new inventory location record
+                        toLocation = new InventoryLocation
+                        {
+                            ItemId = itemIdTrimmed,
+                            ItemName = fromLocation.ItemName?.Trim(),
+                            Description = fromLocation.Description,
+                            Billable = fromLocation.Billable,
+                            LocationId = toLocationId,
+                            OnHand = 0 // Will be updated by WriteInventoryTransferAsync
+                        };
+                        
+                        contextToUse.InventoryLocations.Add(toLocation);
+                        await contextToUse.SaveChangesAsync();
+                        Console.WriteLine($"DEBUG: Created new inventory location record for item '{itemIdTrimmed}' at location {toLocationId}");
+                    }
+                    else
+                    {
+                        toLocation = existingToLocation;
+                        Console.WriteLine($"DEBUG: Using existing inventory location record for item '{itemIdTrimmed}' at location {toLocationId}");
+                    }
+                    
+                    // Get the quantity to transfer (all remaining at the source location)
+                    double quantity = fromLocation.OnHand ?? 0;
+                    
+                    if (quantity <= 0)
+                    {
+                        Console.WriteLine($"WARNING: Skipping transfer for item '{itemIdTrimmed}' as quantity is {quantity}");
+                        continue;
+                    }
+                    
+                    // Create the transfer record
+                    await WriteInventoryTransferAsync(
+                        quantity,
+                        string.Empty, // description
+                        fromLocation,
+                        toLocation,
+                        "WES", // company
+                        "MOVE", // job
+                        takenFrom,
+                        transferDate,
+                        string.Empty, // poNumber
+                        0, // costPer
+                        0, // lockerTotal
+                        0, // inventoryTotal
+                        inspectedBy,
+                        serviceProvider
+                    );
+                    
+                    Console.WriteLine($"DEBUG: Created transfer record for {quantity} of item '{itemIdTrimmed}' from location {fromLocationId} to {toLocationId}");
+                }
+                
+                return;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR: Exception in MoveInventoryAsync: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                throw new InvalidOperationException("Failed to move inventory", ex);
+            }
+            finally
+            {
+                // Dispose the context if we created a new one
+                if (contextToUse != _dbContext)
+                {
+                    await contextToUse.DisposeAsync();
+                }
+            }
+        }
     }
 }
